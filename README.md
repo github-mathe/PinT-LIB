@@ -15,17 +15,38 @@ For each cell type, the following test protocols are implemented:
 ## Directory Structure
 
 ```
-pybamm_lithium/
-├── Parameter/
-│   └── Javid/          # Cell parameters for both half and full cells
-└── testcases/          # Test case implementations (this directory)
-    │----cccv_half_cell.ipynb
-    │----gitt_half_cell.ipynb
-    │----cccv_full_cell.ipynb
-    │----gitt_full_cell.ipynb
+batpint/            # Python library for parameters and base code
+└── parameter/
+    └── javid/
+        │---Li_full.py
+        │---Li_half.py
+scripts/            # Test case implementations
+└── notebooks/
+    │---cccv_half_cell.ipynb
+    │---gitt_half_cell.ipynb
+    │---cccv_full_cell.ipynb
+    │---gitt_full_cell.ipynb
+└── notebooks
+    │---01_baseCase.py  # script to simulate every cases in the notebooks
 ```
 
-## Prerequisites
+## Installation
+
+All test cases implemented in the [`scripts`](./scripts) folder relies on code implemented in the `batpint` python package.
+It requires `python>=3.10` and can be simply installed on your own python environment using :
+
+```bash
+pip install --no-deps -e .
+```
+
+> 💡 The `-e` options install the `batpint` package in editable mode : any modification on the code will be automatically taken into account when updating the package import.
+
+Note that the previous command install without the packages dependencies (like `pybamm`, `numpy`, `matplotlib`, see [pyproject.toml](./pyproject.toml) for the complete list). 
+To install all dependencies at the same time (or check that they are installed), just run :
+
+```bash
+pip install -e .
+```
 
 ### Required Software
 
