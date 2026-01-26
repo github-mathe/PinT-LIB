@@ -1,11 +1,12 @@
 import pybamm
+import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
 import batpint.parameter.javid as bpar
 
 # Script parameters
-half_cell = False
+half_cell = True
 exp = "CCCV" # GITT or CCCV
 
 # Run script
@@ -52,7 +53,7 @@ if exp == "GITT":
     )
 elif exp == "CCCV":
     # define CCVV experiment: many cycles of discharge / charge
-    N = 100 # number of cycles
+    N = 2 # number of cycles
     experiment = pybamm.Experiment(
         [
             (
@@ -86,7 +87,7 @@ print(f" -- done in {tEnd-tBeg:1.2f}s")
 
 # Extract data
 print("Extracting data ...")
-time = sol["Time [h]"].entries
+times = sol["Time [h]"].entries
 voltage = sol["Voltage [V]"].entries
 capacity = sol["Discharge capacity [A.h]"].entries
 print(" -- done")
@@ -94,16 +95,16 @@ print(" -- done")
 # %% Plots
 label = f"{exp} ({'HC' if half_cell else 'FC'})"
 
-plt.figure("voltage vs capacity")
-plt.plot(capacity, voltage, label=label)
-plt.xlabel('Capacity [Ah]'), plt.ylabel('Voltage [V]')
-plt.grid(True), plt.legend(), plt.tight_layout()
+# plt.figure("voltage vs capacity")
+# plt.plot(capacity, voltage, label=label)
+# plt.xlabel('Capacity [Ah]'), plt.ylabel('Voltage [V]')
+# plt.grid(True), plt.legend(), plt.tight_layout()
 
-plt.figure("first and last cycle")
-for iC in [0, len(sol.cycles)-1]:
-    cycle = sol.cycles[iC]
-    t = cycle["Time [h]"].entries
-    v = cycle["Voltage [V]"].entries
-    ax = plt.plot(t-t[0], v, label=f"{label} - C{iC+1}")
+plt.figure("cycles")
+deltas = np.ediff1d(np.concat(sol.all_ts))
+deltas /= voltage.max()*10
+deltas += 2
+plt.plot(times, voltage, label=f"{label}")
+plt.plot(times[1:], deltas, 'k--')
 plt.xlabel('Time [h]'), plt.ylabel('Voltage [V]')
 plt.grid(True), plt.legend(), plt.tight_layout()
