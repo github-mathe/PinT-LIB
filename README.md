@@ -48,13 +48,6 @@ To install all dependencies at the same time (or check that they are installed),
 pip install -e .
 ```
 
-### Required Software
-
-1. **PyBaMM** - Battery modeling framework
-2. **Jupyter Notebook** - For running the test case notebooks
-
-For detailed installation instructions, visit the [PyBaMM Installation Guide](https://docs.pybamm.org/en/latest/source/user_guide/installation/index.html).
-
 ## Cell Parameters
 
 The cell parameters used in these test cases are based on the research published in:
@@ -106,10 +99,12 @@ For more details on available solvers and their characteristics, refer to the [P
 ## Learn More
 
 ### PyBaMM Documentation
+
 - [PyBaMM Documentation](https://docs.pybamm.org/)
 - [PyBaMM GitHub Repository](https://github.com/pybamm-team/PyBaMM)
 
 ### Battery Testing Protocols
+
 - [CCCV Charging Protocol](https://docs.pybamm.org/en/v23.5_a/source/examples/notebooks/simulating-long-experiments.html)
 - [GITT Technique](https://doi.org/10.1002/adts.202500302)
 - [Lithium-Ion Battery Modeling with PyBaMM](https://docs.pybamm.org/en/latest/source/examples/index.html)
