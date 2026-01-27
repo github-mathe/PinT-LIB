@@ -1,13 +1,15 @@
 import pybamm
 import numpy as np
-import matplotlib.pyplot as plt
 from time import time
 
+from batpint import plt
 import batpint.parameter.javid as bpar
 
 # Script parameters
-half_cell = True
+half_cell = False
 exp = "CCCV" # GITT or CCCV
+nCycles = 2
+showTimeSteps = True
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
@@ -41,19 +43,17 @@ if exp == "GITT":
 
     # Create GITT discharge experiment
     # Tuple groups discharge+rest as ONE cycle
-    N = 50  # number of cycles
     experiment = pybamm.Experiment(
         [
             (
                 f"Discharge at {current_rate} for {pulse_duration}",
                 f"Rest for {rest_duration}"
             )
-        ] * N,  # repeat 50 pulse-rest cycles
+        ] * nCycles,
         termination=f"{voltage_min} V"
     )
 elif exp == "CCCV":
     # define CCVV experiment: many cycles of discharge / charge
-    N = 2 # number of cycles
     experiment = pybamm.Experiment(
         [
             (
@@ -64,7 +64,7 @@ elif exp == "CCCV":
             "Rest for 10 minutes"
             )
         ]
-        * N
+        * nCycles
         )
 else:
     raise NotImplementedError(f"{exp=}")
@@ -95,16 +95,25 @@ print(" -- done")
 # %% Plots
 label = f"{exp} ({'HC' if half_cell else 'FC'})"
 
-# plt.figure("voltage vs capacity")
-# plt.plot(capacity, voltage, label=label)
-# plt.xlabel('Capacity [Ah]'), plt.ylabel('Voltage [V]')
-# plt.grid(True), plt.legend(), plt.tight_layout()
+plt.figure("voltage vs capacity")
+plt.plot(capacity, voltage, label=label)
+plt.xlabel('Capacity [Ah]'), plt.ylabel('Voltage [V]')
+plt.grid(True), plt.legend(), plt.tight_layout()
+
+
 
 plt.figure("cycles")
-deltas = np.ediff1d(np.concat(sol.all_ts))
-deltas /= voltage.max()*10
-deltas += 2
 plt.plot(times, voltage, label=f"{label}")
-plt.plot(times[1:], deltas, 'k--')
 plt.xlabel('Time [h]'), plt.ylabel('Voltage [V]')
-plt.grid(True), plt.legend(), plt.tight_layout()
+plt.grid(True), plt.legend()
+
+if showTimeSteps:
+    deltas = np.ediff1d(np.concat(sol.all_ts))
+    deltas /= voltage.max()*10
+    deltas += 2
+
+    ax = plt.gca().twinx()
+    ax.set_ylabel("Time steps size")
+    ax.plot(times[1:], deltas, ':', color="gray")
+
+plt.tight_layout()
