@@ -6,8 +6,8 @@ from batpint import plt
 import batpint.parameter.javid as bpar
 
 # Script parameters
-half_cell = False
-exp = "CCCV" # GITT or CCCV
+half_cell = True
+exp = "GITT" # GITT or CCCV
 nCycles = 2
 showTimeSteps = True
 
@@ -20,11 +20,11 @@ print(model.default_var_pts)
 
 # Space discretization
 var_pts = {
-    "x_n": 3,
-    "x_s": 30,
-    "x_p": 30,
-    "r_n": 3,
-    "r_p": 100
+    "x_n": 3,   # points in the negative electrode
+    "x_s": 30,  # points in the separator
+    "x_p": 30,  # points in the positive electrode
+    "r_n": 3,   # points in the radius of negative electrode
+    "r_p": 100  # points in the radius of positive electrode
 }
 
 # Setup experiment
