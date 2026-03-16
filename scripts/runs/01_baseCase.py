@@ -1,22 +1,23 @@
 import pybamm
 import numpy as np
 from time import time
-
+from pprint import pp as pprint
 from batpint import plt
 import batpint.parameter.javid as bpar
 
 # Script parameters
 half_cell = True
-exp = "GITT" # GITT or CCCV
-nCycles = 2
+exp = "CCCV" # GITT or CCCV
+nCycles = 3
 showTimeSteps = True
+sType = "IDAKLU"
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
 model = pybamm.lithium_ion.DFN(*args)
 
 print("Model variables :")
-print(model.default_var_pts)
+pprint(model.default_var_pts)
 
 # Space discretization
 var_pts = {
@@ -70,7 +71,13 @@ else:
     raise NotImplementedError(f"{exp=}")
 
 # Setup solver
-solver = pybamm.CasadiSolver(mode="safe")
+if sType == "CASADI":
+    solver = pybamm.CasadiSolver(mode="safe")
+elif sType == "IDAKLU":
+    solver = pybamm.IDAKLUSolver()
+else:
+    raise NotImplementedError(f"{sType=}")
+
 
 # Run simulation
 print("Running simulation ...")
@@ -83,7 +90,8 @@ sim = pybamm.Simulation(
     var_pts=var_pts)
 sol = sim.solve()
 tEnd = time()
-print(f" -- done in {tEnd-tBeg:1.2f}s")
+tComp = tEnd-tBeg
+print(f" -- done in {tComp:1.2f}s ({tComp/nCycles:1.2f}s per cycle)")
 
 # Extract data
 print("Extracting data ...")
