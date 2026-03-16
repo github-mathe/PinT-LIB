@@ -26,7 +26,7 @@ scripts/            # Test case implementations
     │---gitt_half_cell.ipynb
     │---cccv_full_cell.ipynb
     │---gitt_full_cell.ipynb
-└── notebooks
+└── runs
     │---01_baseCase.py  # script to simulate every cases in the notebooks
 ```
 
