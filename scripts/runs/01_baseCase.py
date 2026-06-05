@@ -8,7 +8,7 @@ import batpint.parameter.javid as bpar
 # Script parameters
 half_cell = True
 exp = "CCCV" # GITT or CCCV
-nCycles = 3
+nCycles = 30
 showTimeSteps = True
 sType = "IDAKLU"
 
