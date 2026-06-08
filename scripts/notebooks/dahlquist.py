@@ -61,8 +61,8 @@ error_sol, error_solP, error_timeP = compute_Linf(dtVals, exact,num)
 
 plt.figure()
 plt.loglog(dtVals, error_sol, label=r"$\|U_{ex} - U_{num}\|$")
-plt.loglog(dtVals, error_timeP, "--", c="gray", label=r"\|tP_{ex} -tP_{num}\| error")
-plt.loglog(dtVals, error_solP, "-*", c="gray", label=r"\|uP_{ex} -tP_{num}\| error")
+plt.loglog(dtVals, error_timeP, "--", c="gray", label=r"$\|tP_{ex} -tP_{num}\|$ error")
+plt.loglog(dtVals, error_solP, "-*", c="gray", label=r"$\|uP_{ex} -tP_{num}\|$ error")
 plt.xlabel("$dt$"), plt.ylabel("Error"), plt.grid();
 plt.legend();
 
@@ -99,21 +99,6 @@ for k in range(K+1):
     error_TP_coarse_fine[:,k]   = np.linalg.norm(T_coarse_fine[:,k,1:]-TP_ex,ord=np.inf,axis=1)
     error_UP_coarse_fine[:,k]   = np.linalg.norm(U_coarse_fine[:,k,1:]-UP_ex,ord=np.inf,axis=1)
 
-fig, ax = plt.subplots(1,2)
-plt.semilogy(range(K+1), error_TP, c="k", label = "Error between Parareal and Exact solvers")
-ax.semilogy(range(K+1), error_TP_coarse_fine[0,:], "-o", c="red", label = "Error between fine and Exact solvers")
-ax.semilogy(range(K+1), error_TP_coarse_fine[1,:], "o", c="blue",label = "Error between coarse and Exact solvers")
-ax.semilogy(range(K+1), error_TP_coarse_fine[2,:], "-", c="blue", alpha=0.6, label = "Error between sequential coarse and Exact solvers")
-ax.xticks(range(K+1))
-ax.xlabel("Parareal iteration k"), ax.ylabel("Error in time"), ax.grid();
-ax.legend()
-
-ax.semilogy(range(K+1), error_UP, c="k", label = "Error between Parareal and Exact solvers")
-ax.semilogy(range(K+1), error_UP_coarse_fine[0,:], "-o", c="red", label = "Error between fine and Exact solvers")
-plt.semilogy(range(K+1), error_UP_coarse_fine[1,:], "o", c="blue",label = "Error between coarse and Exact solvers")
-plt.semilogy(range(K+1), error_UP_coarse_fine[2,:], "-", c="blue", alpha=0.6, label = "Error between sequential coarse and Exact solvers")
-plt.xticks(range(K+1))
-plt.xlabel("Parareal iteration k"), plt.ylabel("Error in solution"), plt.grid();
 
 
 
