@@ -42,7 +42,7 @@ plt.legend(loc="upper left"), plt.xlabel("time"), plt.ylabel("solution"), plt.gr
 
 # numerical solution
 dt = 0.001
-T, uNum, TP, UP, steps = timeStepperAll(u0,alpha,lam, t0, dt, pStart, N)
+T, uNum, TP, UP, steps = timeStepperAll(u0, alpha, lam, t0, dt, pStart, N)
 
 # plot Re vs Im parts of the 
 # analytical and numerical solutions 
@@ -54,7 +54,7 @@ plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), 
 
 
 # compute L_inf error between solutions
-dtVals  =  1./(10**np.arange(5))
+dtVals  =  1./(10**np.arange(7))
 exact   = lambda dt: analytical_all(u0, alpha,lam, t0, dt, N)
 num     = lambda dt: timeStepperAll(u0,alpha,lam, t0, dt, pStart, N)
 error_sol, error_solP, error_timeP = compute_Linf(dtVals, exact,num)
@@ -86,19 +86,32 @@ _, _, TP_ex, UP_ex, steps_ex = timeStepperAll(u0, alpha, lam, t0, dtF, pStart, N
 
 
 # compute L_inf error in 
-error_TP = np.zeros(K+1)                    # time between Parareal and exact
-error_UP = np.zeros(K+1)                    # solution between Parareal and exact
+error_TP_para = np.zeros(K+1)                    # time between Parareal and exact
+error_UP_para = np.zeros(K+1)                    # solution between Parareal and exact
 error_TP_coarse_fine = np.zeros((3,K+1))    # time between fine, coarse and sequential coarse solvers
 error_UP_coarse_fine = np.zeros((3,K+1))    # solution between fine, coarse and sequential coarse solvers
 
 
 for k in range(K+1):
-    error_TP[k] = np.linalg.norm(TP_para[k,:]-TP_ex,ord=np.inf)
-    error_UP[k] = np.linalg.norm(UP_para[k,:]-UP_ex,ord=np.inf)
+    error_TP_para[k] = np.linalg.norm(TP_para[k,:]-TP_ex,ord=np.inf)
+    error_UP_para[k] = np.linalg.norm(UP_para[k,:]-UP_ex,ord=np.inf)
 
     error_TP_coarse_fine[:,k]   = np.linalg.norm(T_coarse_fine[:,k,1:]-TP_ex,ord=np.inf,axis=1)
     error_UP_coarse_fine[:,k]   = np.linalg.norm(U_coarse_fine[:,k,1:]-UP_ex,ord=np.inf,axis=1)
 
+iterK = np.repeat(np.arange(K+1).reshape(1,6), repeats=4, axis=0)
+errors_time = np.concatenate((error_TP_para.reshape(1,6), error_TP_coarse_fine), axis =0)
+errors_sol = np.concatenate((error_UP_para.reshape(1,6), error_UP_coarse_fine), axis =0)
 
+fig = plt.figure(figsize=(15, 8))
 
+plt.subplot(1,2, 1)
+plt.semilogy(iterK.T,errors_time.T)
+plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
+plt.legend(["Error in Parareal grid","Error in fine grid","Error in coarse grid", "Error in coarse sequential grid"])
+
+plt.subplot(1,2, 2)
+plt.semilogy(iterK.T,errors_sol.T)
+plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
+plt.legend(["Error in Parareal solution","Error in fine solution","Error in coarse solution", "Error in coarse sequential solution"], loc='best')
 
