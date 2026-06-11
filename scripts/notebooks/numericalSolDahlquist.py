@@ -16,6 +16,8 @@ def timeStepperPeriod(u0,alpha,lam_f, t0,nP,dt):
     u = [u0]  
     tt = [t0]
     lam_nP = lam_f(nP)
+    assert lam_nP**2 + alpha**2 != 0, "resonance regime, different analytical solution"
+
     
     #UP = np.zeros(1, dtype=complex)  # to store the period point for the current period
     #TP = np.zeros(1, dtype=float)  # to store the period point for the current period

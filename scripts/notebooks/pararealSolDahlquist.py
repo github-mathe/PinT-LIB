@@ -28,8 +28,8 @@ def pararealADahlquist(F, G, u0, t0, N, K, dtStart, dtF, dtG):
             TPF, UPF, steps         =    F(U[k, n], TT[k,n], dtF, n+1) 
             TPG, UPG, _             =    G(U[k, n], TT[k,n], dtG, n+1)
             TPG_s, UPG_s,_          =    G(U[k+1, n], TT[k+1,n], dtG, n+1)
-            TT[k+1, n+1]            =    TPF[0] + TPG[0] - TPG_s[0] 
-            U[k+1, n+1]             =    UPF[0] + UPG[0] - UPG_s[0]
+            TT[k+1, n+1]            =    TPF[0] - TPG[0] + TPG_s[0] 
+            U[k+1, n+1]             =    UPF[0] - UPG[0] + UPG_s[0]
             T_coarse_fine[:,k+1,n+1]  =    TPF[0], TPG[0], TPG_s[0]
             U_coarse_fine[:,k+1,n+1]  =    UPF[0], UPG[0], UPG_s[0]
             steps_para[k+1, n]      =    steps
