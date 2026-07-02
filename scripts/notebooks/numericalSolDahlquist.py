@@ -38,8 +38,8 @@ def timeStepperPeriod(u0,alpha,lam_f, t0,nP,dt):
             UP = uP_real + 0j
             TP = tP
             steps += 1
-            u.insert(-1, uP_real + 0j)
-            tt.insert(-1, tP)  # insert tP in the correct position to maintain sorted order
+            u[-1]= uP_real + 0j
+            tt[-1]= tP  # insert tP in the correct position to maintain sorted order
             break
     return tt, u, TP, UP, steps
 
@@ -52,10 +52,12 @@ def timeStepperAll(u0, alpha,lam_f, t0, dt, pStart, pEnd):
     UP = np.zeros_like(TP, dtype=complex)
     while nP < pEnd + 1:
         t1, u1, TP1, UP1, steps = timeStepperPeriod(u[-1], alpha, lam_f, tt[-1], nP, dt)
-        tt.extend(t1[1:])  
+        
+        tt.extend(t1[1:])
         u.extend(u1[1:])
         TP[nP - pStart] = TP1
         UP[nP - pStart] = UP1
+             
         nP += 1
         steps += steps
 

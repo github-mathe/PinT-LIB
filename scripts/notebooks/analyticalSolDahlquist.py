@@ -14,7 +14,7 @@ def analytical_one_step(u0, alpha, t0, t1, lam):
     return u
 
 # Analytical solution until period N
-def analytical_all(u0, alpha,lam_f, t0, dt, N, plot_sol = False):
+def analytical_all(u0, alpha,lam_f, t0, dt, N):
     u = [u0]
     nP = 1
     occ = 0
@@ -28,14 +28,16 @@ def analytical_all(u0, alpha,lam_f, t0, dt, N, plot_sol = False):
         t.append(t_next)
         u_next = analytical_one_step(u[-1], alpha, t[-2], t[-1], lam_nP)
         u.append(u_next)
-        occ += u[-1].imag*u[-2].imag < 0 # check for sign change in the imaginary part
+        occ += u[-1].imag*u[-2].imag <0 # check for sign change in the imaginary part
         if occ == 2: # we completed a full period
             tP = np.interp(0, [u[-2].imag, u[-1].imag], [t[-2], t[-1]])
-            uP_real = np.interp(tP, [t[-2], t[-1]], [u[-2], u[-1]])
+            uP_real = np.interp(tP, [t[-2], t[-1]], [u[-2].real, u[-1].real])
             TP[nP-1] = tP  # insert tP in the correct position to maintain sorted order
             UP[nP-1] = uP_real + 0j
-            t.insert(-1, tP)  
-            u.insert(-1, uP_real + 0j)
+            t[-1] = tP
+            u[-1] = uP_real +0j
+            #t.insert(-1, tP)  
+            #u.insert(-1, uP_real + 0j)
             nP += 1
             occ = 0
     return np.squeeze(t), np.squeeze(u), TP, UP
