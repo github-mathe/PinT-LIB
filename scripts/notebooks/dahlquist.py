@@ -24,11 +24,11 @@ pStart = 1
 
 # analytical solution
 dt = 0.001
-N = 5
+N = 2
 t, uTh, tP, uP = analytical_all(u0, alpha,lam, t0, dt, N)
 
 # plot Re vs Im parts of the analytical solution
-plt.figure()
+plt.figure(figsize=(10,6))
 plt.plot(uTh.real, uTh.imag, label="Analytical")
 plt.plot(uP.real, uP.imag, "o", label="Period point")
 plt.legend(), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid();

@@ -26,7 +26,7 @@ def analytical_all(u0, alpha,lam_f, t0, dt, N):
         assert lam_nP**2 + alpha**2 != 0, "resonance regime, different analytical solution"
         t_next = t[-1] + dt
         t.append(t_next)
-        u_next = analytical_one_step(u[-1], alpha, t[-2], t[-1], lam_nP)
+        u_next = analytical_one_step(u0, alpha, t0, t[-1], lam_nP)
         u.append(u_next)
         occ += u[-1].imag*u[-2].imag <0 # check for sign change in the imaginary part
         if occ == 2: # we completed a full period
@@ -40,4 +40,6 @@ def analytical_all(u0, alpha,lam_f, t0, dt, N):
             #u.insert(-1, uP_real + 0j)
             nP += 1
             occ = 0
+            u0=u[-1]
+            t0=t[-1]
     return np.squeeze(t), np.squeeze(u), TP, UP
