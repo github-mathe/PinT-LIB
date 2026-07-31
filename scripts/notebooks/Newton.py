@@ -1,9 +1,9 @@
 import numpy as np
 from collections.abc import Callable
 def Newton(
-    f: Callable[[float | np.ndarray], float | np.ndarray],
-    x: float | np.ndarray,
-    df: Callable[[float | np.ndarray], float | np.ndarray],
+    f: Callable,
+    x: float | complex | np.ndarray,
+    df: Callable,
     tol: float = 1e-7,
     max_iter: int = 100,
     store_history: bool = False
@@ -28,15 +28,15 @@ def Newton(
         if np.linalg.norm(dfx) < 1e-14:
             raise ValueError("Derivative is too small, Newton's method may not converge")
         correction  =    f_value / dfx if is_scalar else np.linalg.solve(dfx, f_value)
-        x   -=  correction
+        x = x -  correction
         n   +=   1
         f_value     =    f(x)
         
         if store_history: history.append((x, f_value))
     if store_history:
-        return x, history
+        return np.squeeze(x), history
     else:
-        return x, n, f_value
+        return np.squeeze(x), n, f_value
 
 if __name__ == "__main__":
     # Example usage skalar function

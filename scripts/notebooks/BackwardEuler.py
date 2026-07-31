@@ -28,18 +28,20 @@ def BackwardEuler(
     y : numpy array
         Array of solution values corresponding to each time point in t.
     """
-    if y0.ndim != 1:
-        raise ValueError("y0 must be scalar or one-dimensional array")
+    y0 = np.atleast_1d(y0)
     if T<t0: raise ValueError("T must be bigger than t0")
     if dt <= 0:
         raise ValueError("dt must be positive")
-    elif dt > T-t0: raise ValueError("time step is bigger than the search interval")
+    step_count = (T - t0) / dt
+    num_steps = int(round(step_count))
+
+    if not np.isclose(step_count, num_steps):
+        raise ValueError("(T - t0) must be an integer multiple of dt")
     
     
     Newton_iterations = []
-    num_steps = int((T - t0) / dt)
     t   =    np.linspace(t0, T, num_steps+1, endpoint=True)
-    y   =    np.zeros((num_steps + 1, len(y0)))
+    y   =    np.zeros((num_steps + 1, len(y0)), dtype = y0.dtype)
     y[0,:]  =    y0
     
     for i in range(num_steps):

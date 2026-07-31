@@ -65,7 +65,7 @@ def check_event(
     u = np.asarray(u, dtype=complex)
     
     sample_t = t[1:]
-    sample_u = u[1:]
+    sample_u = u[1:] 
     
     # Determine the target slope sign and event values
     event_values = np.imag(sample_u) - np.imag(u_start)
