@@ -61,6 +61,11 @@ def check_event(
         Im(u(t_event)) ~= Im(u_start) and Im(u'(t_event))'Im(u'(t_start))>0
         Exact sampled matches and interpolated crossings are both considered.
     """
+    
+    denominator = alpha**2 + lam**2
+    scale = max(1.0, alpha**2, abs(lam) ** 2)
+    if abs(denominator) <= 1e-14 * scale:
+        raise ValueError("Resonance detected: alpha**2 + lam**2 is approximately zero.")
     t = np.asarray(t, dtype=float)
     u = np.asarray(u, dtype=complex)
     
@@ -72,21 +77,19 @@ def check_event(
     event_slopes = np.imag(f_ODE(sample_t, sample_u, alpha, lam))
     initial_slope = np.imag(f_ODE(t_start, u_start, alpha, lam))
     
+    # Change that to an error --> not implemented yet
     if abs(initial_slope) <= slope_tolerance:
-        warnings.warn(
+        raise ValueError(
             "Initial slope is approximately zero; "
-            "crossing direction is undefined.",
-            RuntimeWarning,
-            stacklevel=2,
+            "crossing direction is undefined."
         )
-        return False, None, None
-    
+            
     # Find points already close to the target level
     point_time = None
     point_value = None
     point_idx = np.flatnonzero((np.abs(event_values) <= level_tolerance) & (initial_slope * event_slopes > 0.0))
     if point_idx.size > 0:
-        print(f"The interval [{t_start}, {sample_t[-1]}] has {point_idx.size} points that are close to the pseudo-period.")
+        #print(f"The interval [{t_start}, {sample_t[-1]}] has {point_idx.size} points that are close to the pseudo-period.")
         point_index = point_idx[0]
         point_time = float(sample_t[point_index])
         point_value = np.real(sample_u[point_index]) + 1j * np.imag(u_start)
@@ -106,7 +109,7 @@ def check_event(
         )
 
         if matching_crossings.size:
-            print(f"Detected interval [{t_start}, {sample_t[-1]}] with the pseudo-period.")
+            #print(f"Detected interval [{t_start}, {sample_t[-1]}] with the pseudo-period.")
             left = int(
                 crossing_id[matching_crossings[0]]
             )
@@ -267,7 +270,7 @@ def exact_global_solution(
 
     if interval_lambdas.size != num_windows:
         raise RuntimeError("The number of lambda values does not match the number of pseudo-windows.")
-    print("Pseudo-period boundaries discovered at times:", event_times)
+    
     # ==========================================================
     # Phase 2: construct the user grid on each pseudo-window
     # ==========================================================
@@ -291,7 +294,8 @@ def exact_global_solution(
 
     # Set event values exactly.
     user_u[window_indices] = event_values
-    print("Compute global solution on user grid with", user_t.size, "points.")
+    
+    
     # ==========================================================
     # Phase 3: evaluate the interior of every pseudo-window
     # ==========================================================
@@ -310,7 +314,6 @@ def exact_global_solution(
                                                                 lam=interval_lambdas[i],
                                                                 resonance_tolerance=resonance_tolerance,
                                                             )
-    print("Global solution computed.")
     return (user_t,user_u,event_times,event_values,)
 
 
@@ -322,7 +325,7 @@ if __name__ == "__main__":
     alpha = 6.001
     lam = lambda n: 1j*(1+0.01*n)  # Example lambda function
     Period_start = 1
-    Period_end = 3
+    Period_end = 20
     num_points = 1000
     print("================================")
     print("Computing exact global solution for the ODE with parameters:")

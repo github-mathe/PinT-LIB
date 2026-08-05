@@ -28,15 +28,16 @@ def Newton(
         if np.linalg.norm(dfx) < 1e-14:
             raise ValueError("Derivative is too small, Newton's method may not converge")
         correction  =    f_value / dfx if is_scalar else np.linalg.solve(dfx, f_value)
-        x = x -  correction
+        x -=  correction
         n   +=   1
         f_value     =    f(x)
-        
         if store_history: history.append((x, f_value))
     if store_history:
         return np.squeeze(x), history
     else:
         return np.squeeze(x), n, f_value
+
+
 
 if __name__ == "__main__":
     # Example usage skalar function

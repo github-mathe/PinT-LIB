@@ -8,11 +8,9 @@ Created on Fri Jun  5 11:30:43 2026
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
-from scripts.notebooks.analyticalSolDahlquist import analytical_all, analytical_one_step
-from scripts.notebooks.numericalSolDahlquist import *
-from scripts.notebooks.lamDahlquist import lam
-from scripts.notebooks.error_ExactNum import compute_Linf
-from scripts.notebooks.pararealSolDahlquist import pararealADahlquist
+from scripts.notebooks.DahlquistProblem.tmp.PararealDahlquist import pararealADahlquist
+from scripts.notebooks.DahlquistProblem.tmp.analyticalSolDahlquist import analytical_all, analytical_one_step
+from scripts.notebooks.DahlquistProblem.tmp.numericalSolDahlquist import *
 
 # %%
 # Dahlquist test problem parameters
@@ -20,11 +18,11 @@ alpha = 6.001   # to avoid resonance regime
 u0 = 1+0j
 t0 = 0
 pStart = 1
-
+lam = lambda n: 1j*(1+0.01*n)
 
 # analytical solution
 dt = 0.001
-N = 2
+N = 10
 t, uTh, tP, uP = analytical_all(u0, alpha,lam, t0, dt, N)
 
 # plot Re vs Im parts of the analytical solution
@@ -41,7 +39,6 @@ plt.plot(tP, np.array(uP).imag, 'o', label="Period points")
 plt.legend(loc="upper left"), plt.xlabel("time"), plt.ylabel("solution"), plt.grid();
 
 #%%
-
 # numerical solution
 dt = 0.001
 T, uNum, TP, UP, steps = timeStepperAll(u0, alpha, lam, t0, dt, pStart, N)
@@ -57,10 +54,9 @@ plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), 
 
 # %%
 # compute L_inf error between solutions
-dtVals  =  1./(10**np.arange(6))
+dtVals  =  1./(10**np.arange(1,5))
 exact   = lambda dt: analytical_all(u0, alpha,lam, t0, dt, N)
 num     = lambda dt: timeStepperAll(u0,alpha,lam, t0, dt, pStart, N)
-#error_sol, error_solP, error_timeP = compute_Linf(dtVals, exact,timeStepperAll)
 
 error_timeP = np.zeros_like(dtVals)
 error_solP = np.zeros_like(dtVals)
@@ -74,17 +70,17 @@ TP_th[:,0] = t0
 UP_th[:,0] = u0
 
 for i, dt in enumerate(dtVals):
-    u0 = 1+0j
-    t0 = 0
+    t_start = t0
+    u_start = u0
     tTh, uTh,tpTh,upTh = analytical_all(u0, alpha,lam, t0, dt, N)
     TP_th[i,1:] = tpTh
     UP_th[i,1:] = upTh
     for n in range(N):
-        _, _, tp_ex, up_ex, steps_ex = timeStepperAll(u0, alpha, lam, t0, dt, n+1, n+1)
-        t0 = tp_ex[0]
-        u0 = up_ex[0]
-        TP_num[i,n+1] = t0
-        UP_num[i,n+1] = u0
+        _, _, tp_ex, up_ex, steps_ex = timeStepperAll(u_start, alpha, lam, t_start, dt, n+1, n+1)
+        t_start = tp_ex[0]
+        u_start = up_ex[0].copy() if isinstance(up_ex[0], np.ndarray) else up_ex[0]
+        TP_num[i,n+1] = t_start
+        UP_num[i,n+1] = u_start.copy() if isinstance(u_start, np.ndarray) else u_start
     #min_len = min(len(uTh), len(uNum))
     #uNum = uNum[:min_len]
     #uTh = uTh[:min_len]
@@ -102,51 +98,29 @@ plt.legend();
 
 # %%
 # parareal setup
-#N       =   7
-
-alpha = 6.001   # to avoid resonance regime
-u0 = 1+0j
-t0 = 0
-pStart = 1
-
-K       =   10
+K       =   N+1
 dtF     =   1/10000
 dtG     =   1/100
-#dtInit  =   1
 
 # Parareal implementation 
 F = lambda u0, t0, nP: timeStepperAll(u0, alpha, lam, t0, dtF, nP, nP)#[2:] # fine solver
 G = lambda u0, t0, nP: timeStepperAll(u0, alpha, lam, t0, dtG, nP, nP)#[2:] # coarse solver
 
-TP_para, UP_para,steps_para = pararealADahlquist(F, G, u0, t0, N, K)
-#TP_para     =   TP_para[:,1:]
-#UP_para      =   UP_para[:,1:]
-
+TP_para, UP_para = pararealADahlquist(F, G, u0, t0, N, K)
 
 # compute L_inf error in 
-dtF_index = np.where(dtVals == dtF)[0][0]
-#thres_U = error_sol[dtF_index]
+dtF_index = np.where(dtVals == dtF)[0]
 thres_TP = error_timeP[dtF_index]
 thres_UP = error_solP[dtF_index]
 
-
 error_TP_para = np.zeros(K+1)                    # time between Parareal and exact
 error_UP_para = np.zeros(K+1)                    # solution between Parareal and exact
-#error_TP_coarse_fine = np.zeros((3,K+1))    # time between fine, coarse and sequential coarse solvers
-#error_UP_coarse_fine = np.zeros((3,K+1))    # solution between fine, coarse and sequential coarse solvers
-
 
 for k in range(K+1):
     error_TP_para[k] = np.linalg.norm(TP_para[k,:]-TP_num[dtF_index,:],ord=np.inf)
     error_UP_para[k] = np.linalg.norm(UP_para[k,:]-UP_num[dtF_index,:],ord=np.inf)
 
-   # error_TP_coarse_fine[:,k]   = np.linalg.norm(T_coarse_fine[:,k,1:]-TP_ex,ord=np.inf,axis=1)
-   # error_UP_coarse_fine[:,k]   = np.linalg.norm(U_coarse_fine[:,k,1:]-UP_ex,ord=np.inf,axis=1)
-
 iterK = np.arange(K+1)
-#errors_time = np.concatenate((error_TP_para.reshape(1,K+1), error_TP_coarse_fine), axis =0)
-#errors_sol = np.concatenate((error_UP_para.reshape(1,K+1), error_UP_coarse_fine), axis =0)
-
 labelsT = [r'$\|T_{Parareal} - T_{numEx}\|_\infty$']
 labelsSol = [r'$\|Sol_{Parareal} - Sol_{numEx}\|_\infty$']
 
@@ -174,8 +148,8 @@ plt.show()
 plt.figure(figsize=(15,8))
 plt.subplot(1,2,1)
 for k in range(K+1):
-    err_T = np.abs(TP_para[k,:]-TP_num[dtF_index,:])
-    plt.semilogy(np.arange(N+1), err_T, label=f"k={k}")
+    err_T = np.abs(TP_para[k,:]-TP_num[dtF_index])
+    plt.semilogy(np.arange(N+1), err_T[0], label=f"k={k}")
 plt.xticks(np.arange(1,N+1))
 plt.yscale('symlog', linthresh=1e-14)
 
@@ -186,8 +160,8 @@ plt.legend()
 
 plt.subplot(1,2,2)
 for k in range(K+1):
-    err_U = np.abs(UP_para[k,:]-UP_num[dtF_index,:])
-    plt.semilogy(np.arange(N+1), err_U, label=f"k={k}")
+    err_U = np.abs(UP_para[k,:]-UP_num[dtF_index][:])
+    plt.semilogy(np.arange(N+1), err_U[0], label=f"k={k}")
 plt.xticks(np.arange(1,N+1))
 plt.yscale('symlog', linthresh=1e-14)
 
@@ -195,13 +169,4 @@ plt.xlabel("$n_{th}$ periodic solution $U_n$"), plt.ylabel(r'$\|Sol_{n,Parareal}
 plt.grid(True)
 plt.legend()
 plt.show()
-
 # %%
-
-
-
-
-
-
-
-

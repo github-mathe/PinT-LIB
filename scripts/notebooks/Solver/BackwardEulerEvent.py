@@ -1,5 +1,14 @@
 import numpy as np
 from collections.abc import Callable
+from pathlib import Path
+try:
+    # Use package-relative import when used as a package
+    from .BackwardEuler import BackwardEuler
+except Exception:
+    # Fallback for direct script execution
+    from scripts.notebooks.Solver.BackwardEuler import BackwardEuler
+
+import time
 
 def BackwardEulerEvent(
         f,
@@ -8,7 +17,7 @@ def BackwardEulerEvent(
         y0: float | complex | np.ndarray,
         dt: float,
         event_func: Callable, 
-        num_steps = 1000,
+        num_steps = 1e3,
 ):
     """
         Backward Euler method for solving ODEs of the form dy/dt = f(t,y) with event detection.
@@ -34,40 +43,50 @@ def BackwardEulerEvent(
             y_values: list
                 List of solution values at each step until the event is detected.
         """
-    t_values = [np.array([t0])]
-    y_values = [np.asarray([y0])]
+    t_values = []
+    y_values = []
 
     t = t0
-    y = y0
-    
+    y = y0.copy() if isinstance(y0, np.ndarray) else np.array([y0])
+
     while True:
         # Perform a single Backward Euler step
         T = t + num_steps * dt
-        t_next,y_next,_ = BackwardEuler(f, df, t, y, dt, T)
+        t_next,y_next,_ = BackwardEuler(f, df, t, y, dt, T)  
         is_event, t_event, y_event = event_func(t_next, y_next)
-
+        
         # Check for event detection
         if is_event:
             y_values.append(y_next[t_next<t_event])  # Store the last value before the event
             t_values.append(t_next[t_next<t_event])  # Store the
             break
-
+        
         # Store the new values
-        t_values.append(t_next[1:])
-        y_values.append(y_next[1:])
+        t_values.append(t_next[:-1])
+        y_values.append(y_next[:-1])
 
         # Update time and solution
         y = y_next[-1]
-        t = t_next[-1]    
-
-    t_values = np.concatenate(t_values)
-    y_values = np.concatenate(y_values)
+        t = t_next[-1]   
+    t_values = np.concatenate(t_values, casting = "no")
+    y_values = np.concatenate(y_values, casting = "no")
     return t_values, y_values, t_event, y_event   
 
 
 if __name__ == "__main__":
-    from modified_dahlquist import *
-    from BackwardEuler import *
+    import sys
+
+    # Allow direct script execution without turning folders into packages.
+    _THIS_DIR = Path(__file__).resolve().parent
+    if str(_THIS_DIR) not in sys.path:
+        sys.path.insert(0, str(_THIS_DIR))
+    _DAHLQUIST_DIR = _THIS_DIR.parent
+    _MODIFIED_DIR = _DAHLQUIST_DIR / "ModifiedProblem"
+    if str(_MODIFIED_DIR) not in sys.path:
+        sys.path.insert(0, str(_MODIFIED_DIR))
+
+    check_event = __import__("modified_dahlquist").check_event
+    
     # Dahlquist test problem
     u0 = 1.0 + 0.0j
     t0 = 0.0
@@ -75,11 +94,14 @@ if __name__ == "__main__":
     lam_f = lambda n: 1j*(1+0.01*n)  # Example lambda function
     lam = lam_f(1)  # Example lambda value for the test
     Period_start = 1
-    dt = 0.001
+    dt = 1e-4
     f = lambda t, u: lam * u + np.sin(alpha * t)
     df = lambda t, u: lam  # Derivative of f with respect to u
     event_func = lambda t, u: check_event(t0, u0, t, u, alpha, lam)  # Example event function
-    t_values, y_values, t_event, y_event = BackwardEulerEvent(f, df, t0, u0, dt, event_func, num_steps=1000)
+    t_values, y_values, t_event, y_event = BackwardEulerEvent(
+        f, df, t0, u0, dt, event_func, num_steps=1_000
+    )
+
 
     import matplotlib.pyplot as plt
     plt.plot(t_values, y_values.real, label='Real part of solution')
