@@ -61,7 +61,7 @@ def timeStepperAll(u0, alpha,lam_f, t0, dt, pStart, pEnd):
 
     return (np.asarray(tt, dtype=float), np.asarray(u, dtype=complex), TP, UP, steps)
 
-def directSolverDahlquist(
+def DahlquistBE(
     *args,
     t0,
     y0,
@@ -91,7 +91,7 @@ def directSolverDahlquist(
     y = np.squeeze(y)
     return t, y
 
-def directSolverDahlquistEvent( 
+def DahlquistBEEvent( 
     *args,
     t0,
     y0,
@@ -115,7 +115,7 @@ def directSolverDahlquistEvent(
     while True:
         # Perform a single Backward Euler step
         T = t + num_steps * dt
-        t_next,y_next = directSolverDahlquist(*args, t0 = t, y0=y, dt=dt, T=T, **kwargs)  
+        t_next,y_next = DahlquistBE(*args, t0 = t, y0=y, dt=dt, T=T, **kwargs)  
         is_event, t_event, y_event = event_func(t_next, y_next)
 
         # Check for event detection
