@@ -16,7 +16,13 @@ class Dahlquist():
         self.PP = PP if PP else [P_start]
         self.uP = uP if uP else [u_start]
         self.tP = tP if tP else [t_start]
+        self._num_points = int(1e6)  # default number of points for event detection
 
+    def set_num_points(self, num_points):
+        """Set the number of points for event detection."""
+        if num_points <= 0:
+            raise ValueError("num_points must be a positive integer.")
+        self._num_points = num_points
 
     def f(self, t, u, P):
         """ Evaluate the right-hand side of the Dahlquist problem at time t. Returns the value of u'."""
@@ -103,7 +109,11 @@ class Dahlquist():
             raise ValueError("num_events must be a non-negative integer.")
         if num_events == 0:
             return (np.array([self.t_start]), np.array([self.u_start]), np.array(self.tP), np.array(self.uP))
-        if num_events == len(self.tP) - 1: 
+        if dt is None:
+            dt = 1e-3
+        if dt < self._num_points:
+            self.set_num_points(int(1/dt))
+        if num_events <= len(self.tP) - 1: 
             local_grids: list[np.ndarray] = []
             local_solutions: list[np.ndarray] = []
             for id in range(1,num_events+1):
@@ -122,7 +132,7 @@ class Dahlquist():
             next_P = self.PP[-1]
             for ev in range(num_events - len(self.tP) + 1):
                 next_tEnd = current_t + lenP
-                next_tt = np.linspace(current_t, next_tEnd, int(lenP / dt) + 1)
+                next_tt = np.linspace(current_t, next_tEnd, self._num_points)
                 next_uu = self.u_exact_local(current_t, current_u, next_tt, next_P)
                 event_found, event_t, event_u = self.check_event(current_t, current_u, next_tt, next_uu)
                 if event_found:
@@ -138,28 +148,30 @@ class Dahlquist():
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    # plot the results
+    def plot_dahlquist_solution(user_tt, user_uu, tP_array, uP_array):
+        figure = plt.subplots(figsize=(10, 4))
+        plt.subplot(1, 2, 1)
+        plt.plot(user_tt, np.real(user_uu), label=r"$\mathrm{Re}(u)$", color='blue')
+        plt.plot(user_tt, np.imag(user_uu), label=r"$\mathrm{Im}(u)$", color='orange')
+        plt.scatter(tP_array, np.imag(uP_array), color='green', zorder=5)
+        plt.xlabel('Time t')
+        plt.ylabel('Solution u(t)')
+        plt.legend()
+        plt.grid()
+
+        plt.subplot(1, 2, 2)
+        plt.plot(user_uu.real,user_uu.imag, label='u', color='purple')
+        plt.xlabel(r'$\mathrm{Im}(u)$')
+        plt.ylabel(r'$\mathrm{Re}(u)$')
+        plt.legend()
+        plt.grid()
+        plt.show()
     # Example usage
     dahlquist_problem = Dahlquist(u_start=1.0 + 0.0j, t_start=0.0, P_start=1, alpha=6.001, lam=lambda n: 1j*(1+0.01*n))
-    numP = 10
+    numP = 4
     dt = 0.0001
     user_tt, user_uu, tP_array, uP_array = dahlquist_problem.u_exact_global(numP, dt)
+    user_tt1, user_uu1, tP_array1, uP_array1 = dahlquist_problem.u_exact_global(5, dt)
+    plot_dahlquist_solution(user_tt1, user_uu1, tP_array1, uP_array1)
 
-    # plot the results
-    figure = plt.subplots(figsize=(10, 4))
-
-    plt.subplot(1, 2, 1)
-    plt.plot(user_tt, np.real(user_uu), label=r"$\mathrm{Re}(u)$", color='blue')
-    plt.plot(user_tt, np.imag(user_uu), label=r"$\mathrm{Im}(u)$", color='orange')
-    plt.scatter(tP_array, np.imag(uP_array), color='green', zorder=5)
-    plt.xlabel('Time t')
-    plt.ylabel('Solution u(t)')
-    plt.legend()
-    plt.grid()
-
-    plt.subplot(1, 2, 2)
-    plt.plot(user_uu.real,user_uu.imag, label='u', color='purple')
-    plt.xlabel(r'$\mathrm{Im}(u)$')
-    plt.ylabel(r'$\mathrm{Re}(u)$')
-    plt.legend()
-    plt.grid()
-    plt.show()
