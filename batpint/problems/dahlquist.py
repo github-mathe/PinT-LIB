@@ -2,11 +2,11 @@ import numpy as np
 
 class Dahlquist():
     """Dahlquist problem u' = λu + sin(alpha t), u(0) = u0, t ∈ [0, T]"""
-    def __init__(self, u_start, t_start, alpha, lam, P_start = 1, PP = [], uP = [], tP = []):
+    def __init__(self, t_start, u_start, alpha, lam, P_start = 1, PP = [], uP = [], tP = []):
         if P_start < 1:
             raise ValueError("P_start must be greater than or equal to 1.")
-        self.u_start = u_start
         self.t_start = t_start
+        self.u_start = u_start
         self.alpha = alpha
         if callable(lam):
             self.lam = lam
@@ -119,8 +119,9 @@ class Dahlquist():
             for id in range(1,num_events+1):
                 # Generate a local time grid for the current segment without including the endpoint of the next segment
                 tt = np.linspace(self.tP[id-1], self.tP[id], int((self.tP[id] - self.tP[id-1]) / dt) + 1)
-                local_grids.append(tt)
-                local_solutions.append(self.u_exact_local(self.tP[id-1], self.uP[id-1], tt, self.PP[id-1]))
+                local_grids.append(tt[1:])
+                uu = self.u_exact_local(self.tP[id-1], self.uP[id-1], tt, self.PP[id-1])
+                local_solutions.append(uu[1:])
             user_tt = np.concatenate(local_grids, casting = "no")
             user_uu = np.concatenate(local_solutions, casting = "no")
             return (user_tt, user_uu, np.array(self.tP[:num_events+1]), np.array(self.uP[:num_events+1]))
@@ -149,7 +150,7 @@ class Dahlquist():
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     # plot the results
-    def plot_dahlquist_solution(user_tt, user_uu, tP_array, uP_array):
+    def _plot_dahlquist_solution(user_tt, user_uu, tP_array, uP_array):
         figure = plt.subplots(figsize=(10, 4))
         plt.subplot(1, 2, 1)
         plt.plot(user_tt, np.real(user_uu), label=r"$\mathrm{Re}(u)$", color='blue')
@@ -173,5 +174,5 @@ if __name__ == "__main__":
     dt = 0.0001
     user_tt, user_uu, tP_array, uP_array = dahlquist_problem.u_exact_global(numP, dt)
     user_tt1, user_uu1, tP_array1, uP_array1 = dahlquist_problem.u_exact_global(5, dt)
-    plot_dahlquist_solution(user_tt1, user_uu1, tP_array1, uP_array1)
+    _plot_dahlquist_solution(user_tt1, user_uu1, tP_array1, uP_array1)
 
