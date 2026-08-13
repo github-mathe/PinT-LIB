@@ -30,7 +30,12 @@ class Dahlquist():
             raise ValueError("P must be greater than or equal to 1.")
         """Evaluate the right-hand side of the Dahlquist problem at time t. Returns the value of u'."""
         return self.lam(P) * u + np.sin(self.alpha * t)
-
+    def df(self, t, u, P):
+        """Evaluate the derivative of the right-hand side of the Dahlquist problem with respect to u at time t. Returns the value of du'/du."""
+        if P < 1:
+            raise ValueError("P must be greater than or equal to 1.")
+        """Evaluate the derivative of the right-hand side of the Dahlquist problem with respect to u at time t. Returns the value of du'/du."""
+        return self.lam(P)
     def __str__(self):
         return f"Dahlquist problem with u_start={self.u_start}, t_start={self.t_start}, alpha={self.alpha}, lam={self.lam}, P_start={self.P_start}"
 
@@ -146,6 +151,14 @@ class Dahlquist():
                 current_u = self.uP[-1]
             return self.u_exact_global(num_events, dt)
 
+    def DahlquistBE(self, t, u, dt, P_start = None):
+        """Compute the solution of the Dahlquist problem using the Backward Euler method one step."""
+        P_start = P_start if P_start is not None else self.problem.P_start
+        assert self.alpha**2 + self.lam(P_start)**2 != 0, "resonance regime, different analytical solution"
+
+        t_next = t + dt
+        u_next = (u + dt * np.sin(self.alpha * t_next)) / (1 - dt * self.lam(P_start))
+        return t_next, u_next
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
