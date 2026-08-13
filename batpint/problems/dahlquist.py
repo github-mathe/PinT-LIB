@@ -47,15 +47,15 @@ class Dahlquist():
         u = C*np.exp(self.lam(P)*t) - (self.alpha*np.cos(self.alpha*t) + self.lam(P)*np.sin(self.alpha*t))/denominator
         return u
 
-    def check_event(self, t0, u0, tt , uu):
+    def check_event(self, t0, u0, tt , uu, P):
         """Check if the imaginary part is equal to the imaginary value of the initial condition and the slope directions are in the same direction. The function returns a tuple (event_found, event_time, event_value) where event_found is a boolean indicating whether an event was found, and event_time and event_value are the time and value of the first event found."""
         t = np.asarray(tt[tt > t0])
         u = np.asarray(uu[tt > t0])
 
         # detect events
         event_values = np.imag(u) - np.imag(u0)
-        event_slopes = np.imag(self.f(t, u, self.P_start))
-        initial_slope = np.imag(self.f(t0, u0, self.P_start))
+        event_slopes = np.imag(self.f(t, u, P))
+        initial_slope = np.imag(self.f(t0, u0, P))
 
         if abs(initial_slope) <= 1e-14:
             raise ValueError("Initial slope is approximately zero; "
@@ -111,7 +111,7 @@ class Dahlquist():
             return (np.array([self.t_start]), np.array([self.u_start]), np.array(self.tP), np.array(self.uP))
         if dt is None:
             dt = 1e-3
-        if dt < self._num_points:
+        if int(1/dt) > self._num_points:
             self.set_num_points(int(1/dt))
         if num_events <= len(self.tP) - 1: 
             local_grids: list[np.ndarray] = []
@@ -122,8 +122,8 @@ class Dahlquist():
                 local_grids.append(tt[1:])
                 uu = self.u_exact_local(self.tP[id-1], self.uP[id-1], tt, self.PP[id-1])
                 local_solutions.append(uu[1:])
-            user_tt = np.concatenate(local_grids, casting = "no")
-            user_uu = np.concatenate(local_solutions, casting = "no")
+            user_tt = np.concatenate(local_grids)
+            user_uu = np.concatenate(local_solutions)
             return (user_tt, user_uu, np.array(self.tP[:num_events+1]), np.array(self.uP[:num_events+1]))
         else:
             lenP = np.ceil(2 * np.pi/abs(self.lam(self.P_start)) if self.alpha == 0 \
@@ -135,7 +135,7 @@ class Dahlquist():
                 next_tEnd = current_t + lenP
                 next_tt = np.linspace(current_t, next_tEnd, self._num_points)
                 next_uu = self.u_exact_local(current_t, current_u, next_tt, next_P)
-                event_found, event_t, event_u = self.check_event(current_t, current_u, next_tt, next_uu)
+                event_found, event_t, event_u = self.check_event(current_t, current_u, next_tt, next_uu, next_P)
                 if event_found:
                     next_P += 1
                     self.PP.append(next_P)
@@ -170,9 +170,10 @@ if __name__ == "__main__":
         plt.show()
     # Example usage
     dahlquist_problem = Dahlquist(u_start=1.0 + 0.0j, t_start=0.0, P_start=1, alpha=6.001, lam=lambda n: 1j*(1+0.01*n))
-    numP = 4
-    dt = 0.0001
+    
+    numP = 12
+    dt = 0.001
     user_tt, user_uu, tP_array, uP_array = dahlquist_problem.u_exact_global(numP, dt)
-    user_tt1, user_uu1, tP_array1, uP_array1 = dahlquist_problem.u_exact_global(5, dt)
-    _plot_dahlquist_solution(user_tt1, user_uu1, tP_array1, uP_array1)
+    print("tP_array:", tP_array)
+    print("uP_array:", uP_array)
 
