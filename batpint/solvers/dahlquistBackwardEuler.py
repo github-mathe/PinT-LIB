@@ -1,57 +1,83 @@
+from dbm import error
+
 import numpy as np
 from batpint.problems.dahlquist import Dahlquist
 
 class DahlquistBackwardEuler(Dahlquist):
-    def __init__(self, problem, dt = 1e-3, PP_num = None, uP_num = None, tP_num = None):
+    def __init__(self, problem, dt = 1e-3):
         self.problem = problem
         self.dt = dt  # Default time step for the Backward Euler method
-        self.PP_num = PP_num if PP_num else [problem.P_start]
-        self.uP_num = uP_num if uP_num else [problem.u_start]
-        self.tP_num = tP_num if tP_num else [problem.t_start]
-        self._num_points = 1000  # Default number of points for local solutions
-        self.t = []
-        self.u = []
 
-    def advance(self) -> np.ndarray:
+    def set_initial_conditions(self, u_start, t_start, P_start, num_events: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Compute the solution of the Dahlquist problem using the Backward Euler method for a specified number of events."""
+        self.u_start = u_start
+        self.t_start = t_start
+        self.P_start = P_start
+        self._num_events = num_events
+        self.P = [self.P_start]
+        self.tP = [self.t_start]
+        self.uP = [self.u_start]
+        return 
+
+    def advance(self,t,u, P_start = None):
+        """Compute the solution of the Dahlquist problem using the Backward Euler method one step."""
+        P_start = P_start if P_start is not None else self.problem.P_start
+        t_next = t + self.dt
+        u_next = (u + self.dt * np.sin(self.problem.alpha * t_next)) / (1 - self.dt * self.problem.lam(P_start))
+        return t_next, u_next
+    
+    def advance_event(self, t_start = None, u_start = None, P_start = None) -> np.ndarray:
         """Compute the solution of the Dahlquist problem using the Backward Euler method one pseudoperiod."""
-        t_start = self.tP_num[-1]
-        u_start = self.uP_num[-1]
-        lam = self.problem.lam(self.PP_num[-1])
-        assert self.problem.alpha**2 + lam**2 != 0, "resonance regime, different analytical solution"
+        t_start = t_start if t_start is not None else self.problem.t_start
+        u_start = u_start if u_start is not None else self.problem.u_start
+        P_start = P_start if P_start is not None else self.problem.P_start
+        assert self.problem.alpha**2 + self.problem.lam(P_start)**2 != 0, "resonance regime, different analytical solution"
+        t = [t_start]
+        u = [u_start]
 
         while True:
-            tt = np.linspace(t_start, t_start+self._num_points*self.dt, self._num_points)
-            uu = np.zeros_like(tt, dtype=complex)
-            uu[0] = u_start
-            for i in range(self._num_points-1):
-                uu[i+1] = (uu[i] + self.dt*np.sin(self.problem.alpha*tt[i+1])) / (1 - self.dt*lam)
-            event_found, t_event, u_event = self.problem.check_event(self.tP_num[-1], self.uP_num[-1], tt, uu)
+            tt, uu = self.advance(t[-1], u[-1], P_start)
+            t.append(tt)
+            u.append(uu)
+            event_found, t_event, u_event = self.problem.check_event(t_start, u_start, np.array(t[-2:]), np.array(u[-2:]), P_start)
             if event_found:
-                self.tP_num.append(t_event)
-                self.uP_num.append(u_event)
-                user_t = tt[tt < t_event] # Exclude the first point to avoid duplication
-                user_u = uu[tt < t_event]  # Exclude the first point to avoid duplication
-                self.t.append(user_t)
-                self.u.append(user_u)
-                self.PP_num.append(self.PP_num[-1]+1)
+                t[-1] = t_event
+                u[-1] = u_event
                 break  # Exit the loop if an event is found
-            t_start += self._num_points * self.dt
-            u_start = uu[-1]
-            self.t.append(tt[:-1])
-            self.u.append(uu[:-1])
+        return np.array(t), np.array(u)
 
-    def solve_global(self, num_events: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def solve(self, num_events: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Compute the solution of the Dahlquist problem using the Backward Euler method for a specified number of events."""
         if num_events < 0:
             raise ValueError("num_events must be a non-negative integer.")
         if num_events == 0:
-            return (np.array([self.problem.t_start]), np.array([self.problem.u_start]), np.array(self.tP_num), np.array(self.uP_num))
-        while len(self.tP_num) - 1 < num_events:
-            self.advance()
-        t_values = np.append(np.concatenate(self.t), self.tP_num[num_events])
-        u_values = np.append(np.concatenate(self.u), self.uP_num[num_events])
-        return t_values, u_values, np.array(self.tP_num[:num_events+1]), np.array(self.uP_num[:num_events+1]) 
+            return (np.array([self.problem.t_start]), np.array([self.problem.u_start]), np.array(self.tP), np.array(self.uP))
+        self.set_initial_conditions(self.problem.u_start, self.problem.t_start, self.problem.P_start, num_events)
+        self.t = np.array([self.t_start])
+        self.u = np.array([self.u_start])
+        for _ in range(num_events):
+            tt,uu = self.advance_event(self.t[-1], self.u[-1], self.P[-1])
+            self.t = np.concatenate((self.t, tt[1:]))  # Exclude the first point to avoid duplication
+            self.u = np.concatenate((self.u, uu[1:]))  # Exclude the first point to avoid duplication
+            self.P.append(self.P[-1] + 1)
+            self.tP.append(self.t[-1])
+            self.uP.append(self.u[-1])
+        return self.t, self.u, np.array(self.tP), np.array(self.uP)
 
+    def compute_event_error(self, num_events: int, dt_exact: float) -> float:
+        """Compute the error between the exact solution and the Backward Euler solution for a specified number of events."""
+        _, _, tP_exact, uP_exact = self.problem.u_exact_global(num_events, dt_exact)
+        self.dt = dt_exact
+        _,_, tP_num, uP_num = self.solve(num_events)
+        assert len(tP_exact) == len(tP_num), "Number of events in exact and numerical solutions do not match."
+        min_len = min(len(tP_exact), len(tP_num))
+        uP_exact = uP_exact[:min_len]
+        uP_num = uP_num[:min_len]
+        tP_exact = tP_exact[:min_len]
+        tP_num = tP_num[:min_len]
+        error_uP = np.linalg.norm(uP_exact - uP_num, ord=np.inf)
+        error_tP = np.linalg.norm(tP_exact - tP_num, ord=np.inf)
+        return error_tP, error_uP 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
@@ -62,24 +88,24 @@ if __name__ == "__main__":
                         P_start=1,
                         alpha=6.001,
                         lam=lambda n: 1j*(1+0.01*n))
-    dahlquist_be_solver = DahlquistBackwardEuler(dahlquist_problem, dt= 0.01)
-    num_events = 3
-    user_tt, user_uu, tP_array, uP_array = dahlquist_be_solver.solve_global(num_events)
+    num_events = 2
+    dt_exact = 0.001
+    dt_num = dt_exact
 
-    figure = plt.subplots(figsize=(10, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(user_tt, np.real(user_uu), label=r"$\mathrm{Re}(u)$", color='blue')
-    plt.plot(user_tt, np.imag(user_uu), label=r"$\mathrm{Im}(u)$", color='orange')
-    plt.scatter(tP_array, np.imag(uP_array), color='green', zorder=5)
-    plt.xlabel('Time t')
-    plt.ylabel('Solution u(t)')
-    plt.legend()
-    plt.grid()
+    t_ex,u_ex, tp_ex, up_ex = dahlquist_problem.u_exact_global(num_events=num_events, dt=dt_exact)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(user_uu.real,user_uu.imag, label='u', color='purple')
-    plt.xlabel(r'$\mathrm{Im}(u)$')
-    plt.ylabel(r'$\mathrm{Re}(u)$')
-    plt.legend()
-    plt.grid()
+    dahlquist_be = DahlquistBackwardEuler(dahlquist_problem, dt = dt_num)
+
+    dtVals = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5,1e-6]
+    error_tP = np.zeros_like(dtVals)
+    error_uP = np.zeros_like(dtVals)
+
+    for i,dt in enumerate(dtVals):
+        error_tP[i], error_uP[i] = dahlquist_be.compute_event_error(num_events, dt)
+        print(f"dt = {dt}, error_tP = {error_tP[i]}, error_uP = {error_uP[i]}")
+    plt.figure()
+    plt.loglog(dtVals, error_tP, "--", c="gray", label=r"$\|tP_{ex} -tP_{num}\|_\infty$ error")
+    plt.loglog(dtVals, error_uP, "-*", c="gray", label=r"$\|uP_{ex} -uP_{num}\|_\infty$ error")
+    plt.xlabel("$dt$"), plt.ylabel("Error"), plt.grid();plt.legend()
+    plt.draw()
     plt.show()
