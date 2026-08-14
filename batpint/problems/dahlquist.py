@@ -76,7 +76,7 @@ class Dahlquist():
         if point_idx.size > 0:
             point_index = point_idx[0]
             point_time = float(t[point_index])
-            point_value = np.real(u[point_index]) + 1j * np.imag(self.u_start) 
+            point_value = np.real(u[point_index]) + 1j * np.imag(self.u_start)
 
         # Find the first valid interpolated crossing
         crossing_time = None
@@ -118,7 +118,7 @@ class Dahlquist():
             dt = 1e-3
         if int(1/dt) > self._num_points:
             self.set_num_points(int(1/dt))
-        if num_events <= len(self.tP) - 1: 
+        if num_events <= len(self.tP) - 1:
             local_grids: list[np.ndarray] = []
             local_solutions: list[np.ndarray] = []
             for id in range(1,num_events+1):
@@ -146,7 +146,7 @@ class Dahlquist():
                     self.PP.append(next_P)
                     self.tP.append(event_t)
                     self.uP.append(event_u)
-                
+
                 current_t = self.tP[-1]
                 current_u = self.uP[-1]
             return self.u_exact_global(num_events, dt)
@@ -183,10 +183,9 @@ if __name__ == "__main__":
         plt.show()
     # Example usage
     dahlquist_problem = Dahlquist(u_start=1.0 + 0.0j, t_start=0.0, P_start=1, alpha=6.001, lam=lambda n: 1j*(1+0.01*n))
-    
+
     numP = 12
     dt = 0.001
     user_tt, user_uu, tP_array, uP_array = dahlquist_problem.u_exact_global(numP, dt)
     print("tP_array:", tP_array)
     print("uP_array:", uP_array)
-
