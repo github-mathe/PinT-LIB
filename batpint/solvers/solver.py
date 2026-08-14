@@ -35,23 +35,39 @@ class Solver(object):
                 break  # Exit the loop if an event is found
         return np.array(t), np.array(u)
 
-    def solve(self, num_events: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Compute the solution of the problem using method for a specified number of events."""
+    def solve(self, num_events: int):
+        """Solve the problem for a given number of events."""
         if num_events < 0:
             raise ValueError("num_events must be a non-negative integer.")
+
         if num_events == 0:
-            return (np.array([self.problem.t_start]), np.array([self.problem.u_start]), np.array(self.tP), np.array(self.uP))
+            return (
+                np.asarray([self.problem.t_start]),
+                np.asarray([self.problem.u_start]),
+                np.asarray(self.tP if hasattr(self, "tP") else [self.problem.t_start]),
+                np.asarray(self.uP if hasattr(self, "uP") else [self.problem.u_start]),
+            )
+
         self.set_initial_conditions(self.problem.u_start, self.problem.t_start, self.problem.P_start)
-        self.t = np.array([self.t_start])
-        self.u = np.array([self.u_start])
+
+        t_list = [self.t_start]
+        u_list = [self.u_start]
+        P_list = [self.P_start]
+        tP_list = [self.t_start]
+        uP_list = [self.u_start]
+
         for _ in range(num_events):
-            tt,uu = self.advance_event(self.t[-1], self.u[-1], self.P[-1])
-            self.t = np.concatenate((self.t, tt[1:]))  # Exclude the first point to avoid duplication
-            self.u = np.concatenate((self.u, uu[1:]))  # Exclude the first point to avoid duplication
-            self.P.append(self.P[-1] + 1)
-            self.tP.append(self.t[-1])
-            self.uP.append(self.u[-1])
-        return self.t, self.u, np.array(self.tP), np.array(self.uP)
+            tt, uu = self.advance_event(t_list[-1], u_list[-1], P_list[-1])
+
+            # Skip the first point to avoid duplicating the current state
+            t_list.extend(tt[1:].tolist())
+            u_list.extend(uu[1:].tolist())
+
+            P_list.append(P_list[-1] + 1)
+            tP_list.append(t_list[-1])
+            uP_list.append(u_list[-1])
+
+        return np.asarray(t_list), np.asarray(u_list), np.asarray(tP_list), np.asarray(uP_list)
 
     def compute_event_error(self, num_events: int, dt: float, exact_solver) -> float:
         """Compute the error between the exact solution and the Backward Euler solution for a specified number of events."""
