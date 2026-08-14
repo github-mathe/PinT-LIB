@@ -24,3 +24,42 @@ if T<t0: raise ValueError("T must be bigger than t0")
 if dt <= 0:
     raise ValueError("dt must be positive")
 ```
+
+🗒️ **Next steps**
+
+- **generic formulation of the code to add a Battery Problem class**
+- try to learn a bit more about OOP for more complex applications ... https://collaborating.tuhh.de/e-24/courses/oop/lecture
+
+Generic Problem :
+
+$$
+\frac{du}{dt} = f(u,t,...), u(0) = u0
+$$
+
+- function $f(u, t, ...)$
+- solution $u0$
+- solver $x - \alpha f(x, t) = \beta$ for a given $(\alpha, \beta)$
+
+
+Forward Euler :
+
+$$
+u_{n+1} - u_n = \Delta{t} f(u_{n},t_{n},...)
+$$
+
+- $\Delta{t}$
+- evaluation of $f(u_{n+1},t_{n+1},...)$
+
+Backward Euler :
+
+$$
+u_{n+1} - u_n = \Delta{t} f(u_{n+1},t_{n+1},...)
+$$
+
+- $\Delta{t}$
+- evaluation of $f(u_{n+1},t_{n+1},...)$
+- solve of $x - \Delta{t} f(x, t_{n+1}, ...) = u_n$
+
+Time-Stepper (Generic)
+
+- $\Delta{t}$, nSteps, ...
