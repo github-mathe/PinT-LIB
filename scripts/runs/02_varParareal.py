@@ -1,151 +1,112 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Example script of Parareal with variable time-windows
-"""
 import numpy as np
 import matplotlib.pyplot as plt
+from batpint.problems.dahlquist import Dahlquist
+from batpint.solvers.solver import Solver
+from batpint.solvers.parareal import PararealModified
 
 # Dahlquist test problem parameters
 eps = lambda n: 0.01*n
 lam = lambda n: 1j*(1 + eps(n))
-Period =lambda n: 2*np.pi/abs((lam(n)))
 t0 = 0
-tEnd = 12
 alpha = 6.001   # to avoid resonance regime
 u0 = 1+0j
-
-# linear interpolation function
-def linInterp(x1,x2,y1,y2,x):
-    m = (y2-y1)/(x2-x1)
-    y=y1+m*(x-x1)
-    return y
-
-def timeOneStep(u0, t1, dt, lam):
-    u = (u0 + dt*np.sin(alpha*t1))/(1-dt*lam)
-    return u
-
-def timeStepperPeriod(u0,t0,nP,dt):
-    u = [u0]
-    tt = [t0]
-    lam_nP = lam(nP)
-
-    #UP = np.zeros(1, dtype=complex)  # to store the period point for the current period
-    #TP = np.zeros(1, dtype=float)  # to store the period point for the current period
-    occ = 0
-    steps = 0
-    while True:
-        t_next = tt[-1] + dt
-        u_next = timeOneStep(u[-1], t_next, dt, lam_nP)
-
-        u.append(u_next)
-        tt.append(t_next)
-
-        occ += u[-1].imag*u[-2].imag < 0 # check for sign change in the imaginary part
-        steps += 1
-        if occ == 2: # we completed a full period
-            #nP += 1
-            #lam_nP = lam(nP)
-
-            tP = linInterp(u[-2].imag, u[-1].imag, tt[-2], tt[-1], 0)
-            uP_real = linInterp(tt[-2], tt[-1], u[-2].real, u[-1].real, tP)
-            UP = uP_real + 0j
-            TP = tP
-            steps += 1
-            u.insert(-1, uP_real + 0j)
-            tt.insert(-1, tP)  # insert tP in the correct position to maintain sorted order
-            break
-    return tt, u, TP, UP, steps
-
-def timeStepperAll(u0, t0, dt, pStart, pEnd):
-    nP = pStart
-    tt = [t0]
-    u = [u0]
-    steps = 0
-    TP = np.zeros(pEnd - pStart + 1, dtype=float)
-    UP = np.zeros_like(TP, dtype=complex)
-    while nP < pEnd + 1:
-        t1, u1, TP1, UP1, steps = timeStepperPeriod(u[-1], tt[-1], nP, dt)
-        tt.extend(t1[1:])
-        u.extend(u1[1:])
-        TP[nP - pStart] = TP1
-        UP[nP - pStart] = UP1
-        nP += 1
-        steps += steps
-    return (np.asarray(tt, dtype=float),
-            np.asarray(u, dtype=complex),
-            TP,
-            UP,
-            steps)
-
-
-N = 10 # time windows - coarse time grid
-K = N # Parareal iterations
-dtF = 1/1000 # Fine solver's time steps
-dtG = 1/10 # Coarse solver's time steps
-#tEnd = 12.39
-
 pStart = 1
-T = 0
-TT =  np.zeros((K+1, N+1), dtype=float)
-TT_p = np.zeros((K+1, N), dtype=float)
-U_p = np.zeros((K+1, N), dtype=complex)
+numP = 12
 
+# Time discretization parameters 
+dtEx = 0.001
+dtNum = 0.01
 
-# Parareal implementation
-F = lambda u0, t0, nP: timeStepperAll(u0, t0, dtF, nP, nP) # fine solver
-G = lambda u0, t0, nP: timeStepperAll(u0, t0, dtG, nP, nP) # Coarse solver
+dahlquist = Dahlquist(u_start=u0, t_start=t0, P_start=pStart, alpha=alpha, lam=lam)
+tTh, uTh, tpTh, upTh = dahlquist.u_exact_global(numP, dtEx)
+solver = Solver(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtNum)
+tNum, uNum, tpNum, upNum = solver.solve(num_events=numP)
+# Plotting the results
+plt.plot(uNum.real, uNum.imag, label="Numerical")
+plt.plot(uTh.real, uTh.imag, "--", label="Analytical")
+plt.plot(upNum.real, upNum.imag, 'o', label="upNum")
+plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid();
 
-U = np.zeros((K+1, N+1), dtype=complex)
-U[:, 0] = u0
-steps_para = np.zeros((K+1, N), dtype=int)
-# Initial guess
-p = pStart
+# error analysis
+dtVals =  1./(10**np.arange(5))
+error_tP = np.zeros_like(dtVals)
+error_uP = np.zeros_like(dtVals)
 
-for n in range(N):
-    TG, UG, TPG, UPG, steps = G(U[0, n], TT[0,n], n+1)
-    TT[0,n+1] = TPG[0]#TG[-1]
-    U[0, n+1] = UPG[0]#UG[-1]
-    TT_p[0,n] = TPG[0]
-    U_p[0,n] = UPG[0]
-    steps_para[0, n] = steps
+for i,dt in enumerate(dtVals):
+    error_tP[i], error_uP[i] = solver.compute_event_error(num_events=numP, dt=dt, exact_solver=dahlquist.u_exact_global)
+    print(f"dt = {dt}, error_tP = {error_tP[i]}, error_uP = {error_uP[i]}")
+# Plotting the error
+plt.figure()
+plt.loglog(dtVals, error_tP, "--", c="gray", label=r"$\|tp_{ex} -tp_{num}\|_\infty$ error")
+plt.loglog(dtVals, error_uP, "-*", c="gray", label=r"$\|up_{ex} -up_{num}\|_\infty$ error")
+plt.xlabel("$dt$"), plt.ylabel("Error"), plt.grid();plt.legend()
+plt.draw()
+plt.show()
 
+# Adaptive Parareal
 
-for k in range(K):  # Parareal iterations
-    for n in range(N):
-        TF, UF, TPF, UPF, steps = F(U[k, n], TT[k,n],n+1)
-        TG, UG, TPG, UPG, _ = G(U[k, n], TT[k,n],n+1)
-        TG_seq, UG_seq, TPG_seq, UPG_seq,_ = G(U[k+1, n], TT[k+1,n],n+1)
-        TT[k+1, n+1] = TPF[0] + TPG[0] - TPG_seq[0]
-        U[k+1, n+1] = UPF[0] + UPG[0] - UPG_seq[0]
-        TT_p[k+1, n] = TPF[0]
-        U_p[k+1, n] = UPF[0]
-        steps_para[k+1, n] = steps
+N = numP # time windows - coarse time grid
+K = N+1 # Parareal iterations
+dtF = 1/1000 # Fine solver's time steps
+dtG = 1/100  # Coarse solver's time steps
+dahlquistBE_F = Solver(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtF)
+dahlquistBE_G = Solver(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtG)
+# Parareal implementation 
+F = lambda t, u, P: [res[-1] for res in dahlquistBE_F.advance_event(t,u,P)] # fine solver
+G = lambda t, u, P: [res[-1] for res in dahlquistBE_G.advance_event(t,u,P)] # Coarse solver
+tpPara, upPara = PararealModified(F, G,dahlquist.t_start, dahlquist.u_start, N, K)
 
+# compare with fine exact solution
+tFine,uFine,tpFine, upFine = dahlquistBE_F.solve(num_events=N)
+dtF_index = np.where(dtVals == dtF)[0][0]
+thres_tp = error_tP[dtF_index]                   # threshold for time error between analytical and fine numerical
+thres_up = error_uP[dtF_index]  
+error_tp_per_window = np.zeros((K, N+1), dtype=float)
+error_up_per_window = np.zeros((K, N+1), dtype=float)
+for k in range(K):
+    error_tp_per_window[k,:] = np.abs(tpPara[k,:]-tpFine)
+    error_up_per_window[k,:] = np.abs(upPara[k,:]-upFine)
+error_tp_per_iteration = np.max(error_tp_per_window, axis=1)
+error_up_per_iteration = np.max(error_up_per_window, axis=1)
 
-# exact solution
-t_ex, U_exact, tP_ex, uP_ex, steps_num = timeStepperAll(u0, t0, dtF/N,pStart, N)
-steps_num, sum(steps_para[-1,:])
-
-
-errors_para_TT = []
-errors_para_U = []
-for k in range(K+1):
-    #errors_para_tP.append(np.linalg.norm(TT_p[k]-np.array(tP_ex),ord=np.inf))
-    #errors_para_uP.append(np.linalg.norm(U_p[k]-np.array(uP_ex),ord=np.inf))
-    errors_para_U.append(np.linalg.norm(U[k,1:]-uP_ex,ord=np.inf))
-    errors_para_TT.append(np.linalg.norm(TT[k,1:]-tP_ex,ord=np.inf))
-plt.semilogy(range(K+1), errors_para_TT)
-plt.semilogy(range(K+1), errors_para_U)
-plt.xticks(range(K+1))
+#plotting the error per iteration
+fig = plt.figure(figsize=(12, 8))
+fig.suptitle(f"Adaptive Parareal Error for N={N+1}")
+plt.subplot(1,2, 1)
+plt.semilogy(range(K), error_tp_per_iteration, label=r'$\|tp_{Parareal} - tp_{FineNum}\|_\infty$')
+plt.axhline(y=thres_tp, color='red', linestyle='--', label="Fine solver error")
+plt.xticks(range(K))
+plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
-plt.legend(["Error in coarse grid", "Error in coarse solution"])
-# tTh, uTh,tpTh,upTh = analytical_all(u0, t0, dtF/N, N)
-# min_len = min(len(uTh), len(U_exact))
-# U_exact = U_exact[:min_len]
-# uTh = uTh[:min_len]
-# error_seq = np.linalg.norm(uTh-U_exact, ord=np.inf)
-# error_seq_tP = np.linalg.norm(tpTh-tP_ex, ord=np.inf)
+plt.legend()
 
-print(f"Error in coarse time: {errors_para_TT[K]:.6e}")
-print(f"Error in coarse solution: {errors_para_U[K]:.6e}")
+plt.subplot(1,2, 2)
+plt.semilogy(range(K), error_up_per_iteration, label=r'$\|up_{Parareal} - up_{FineNum}\|_\infty$')
+plt.axhline(y=thres_up, color='red', linestyle='--', label="Fine solver error")
+plt.xticks(range(K))
+plt.yscale('symlog', linthresh=1e-14)
+plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
+plt.legend()  
+plt.tight_layout()  
+
+# plotting the error vs N points
+fig = plt.figure(figsize=(12, 8))
+fig.suptitle(f"Adaptive Parareal Error for N={N+1}")
+plt.subplot(1,2, 1)
+for k in range(K):
+    plt.semilogy(range(N+1), error_tp_per_window[k,:], label=f"k={k}")
+plt.axhline(y=thres_tp, color='red', linestyle='--', label="Fine solver error")
+plt.xticks(range(N+1))
+plt.yscale('symlog', linthresh=1e-14)
+plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
+
+
+plt.subplot(1,2, 2)
+for k in range(K):
+    plt.semilogy(range(N+1), error_up_per_window[k,:], label=f"k={k}")
+plt.axhline(y=thres_up, color='red', linestyle='--', label="Fine solver error")
+plt.xticks(range(N+1))
+plt.yscale('symlog', linthresh=1e-14)
+plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
+plt.tight_layout()
+    
