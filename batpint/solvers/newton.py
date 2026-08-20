@@ -21,12 +21,10 @@ def Newton(
 
     f_value = f(x)
     n = 0
-    if store_history:
-        history = [(x, f_value)]
+    if store_history: history = [(x, f_value)]
     while np.linalg.norm(f_value) > tol and n < max_iter:
         dfx = df(x)
-        if np.linalg.norm(dfx) < 1e-14:
-            raise ValueError("Derivative is too small, Newton's method may not converge")
+        if np.linalg.norm(dfx) < 1e-14: raise ValueError("Derivative is too small, Newton's method may not converge")
         correction  =    f_value / dfx if is_scalar else np.linalg.solve(dfx, f_value)
         x -=  correction
         n   +=   1
