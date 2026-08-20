@@ -92,7 +92,7 @@ if __name__ == "__main__":
     dahlquist = Dahlquist(
                         u_start=1.0 + 0.0j,
                         t_start=0.0,
-                        P_start=1,
+                        period_start=1,
                         alpha=6.001,
                         lam=lambda n: 1j*(1+0.01*n))
     num_events = 5
@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
     t_ex,u_ex, tp_ex, up_ex = dahlquist.u_exact_global(num_events=num_events, dt=dt_exact)
 
-    BE_modified = lambda t, u, dt, P_start: BackwardEuler(f=lambda t, u: dahlquist.f(t, u, P_start),df = lambda t, u: dahlquist.df(t, u, P_start), t0 = t, y0=u, dt=dt, T = t + dt)[0:2]
+    BE_modified = lambda t, u, dt, period_start: BackwardEuler(f=lambda t, u: dahlquist.f(t, u, period_start),df = lambda t, u: dahlquist.df(t, u, period_start), t0 = t, y0=u, dt=dt, T = t + dt)[0:2]
     solverBE = TimeStepper(dahlquist, dt = dt_num, method = BE_modified)
     _,_,tpBE,upBE = solverBE.solve(num_events)
 

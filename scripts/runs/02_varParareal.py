@@ -17,7 +17,7 @@ numP = 12
 dtEx = 0.001
 dtNum = 0.01
 
-dahlquist = Dahlquist(u_start=u0, t_start=t0, P_start=pStart, alpha=alpha, lam=lam)
+dahlquist = Dahlquist(u_start=u0, t_start=t0, period_start=pStart, alpha=alpha, lam=lam)
 tTh, uTh, tpTh, upTh = dahlquist.u_exact_global(numP, dtEx)
 solver = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtNum)
 tNum, uNum, tpNum, upNum = solver.solve(num_events=numP)
