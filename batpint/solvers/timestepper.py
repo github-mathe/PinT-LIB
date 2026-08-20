@@ -1,6 +1,6 @@
 import numpy as np
 
-class Solver(object):
+class TimeStepper(object):
     def __init__(self, problem, method, dt = 1e-3):
         self.problem = problem
         self.method = method
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     t_ex,u_ex, tp_ex, up_ex = dahlquist.u_exact_global(num_events=num_events, dt=dt_exact)
 
     BE_modified = lambda t, u, dt, P_start: BackwardEuler(f=lambda t, u: dahlquist.f(t, u, P_start),df = lambda t, u: dahlquist.df(t, u, P_start), t0 = t, y0=u, dt=dt, T = t + dt)[0:2]
-    solverBE = Solver(dahlquist, dt = dt_num, method = BE_modified)
+    solverBE = TimeStepper(dahlquist, dt = dt_num, method = BE_modified)
     _,_,tpBE,upBE = solverBE.solve(num_events)
 
     dtVals = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]

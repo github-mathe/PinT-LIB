@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from batpint.problems.dahlquist import Dahlquist
-from batpint.solvers.solver import Solver
+from batpint.solvers.timestepper import TimeStepper
 from batpint.solvers.parareal import PararealModified
 
 # Dahlquist test problem parameters
@@ -19,7 +19,7 @@ dtNum = 0.01
 
 dahlquist = Dahlquist(u_start=u0, t_start=t0, P_start=pStart, alpha=alpha, lam=lam)
 tTh, uTh, tpTh, upTh = dahlquist.u_exact_global(numP, dtEx)
-solver = Solver(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtNum)
+solver = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtNum)
 tNum, uNum, tpNum, upNum = solver.solve(num_events=numP)
 # Plotting the results
 plt.plot(uNum.real, uNum.imag, label="Numerical")
@@ -49,8 +49,8 @@ N = numP # time windows - coarse time grid
 K = N+1 # Parareal iterations
 dtF = 1/1000 # Fine solver's time steps
 dtG = 1/100  # Coarse solver's time steps
-dahlquistBE_F = Solver(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtF)
-dahlquistBE_G = Solver(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtG)
+dahlquistBE_F = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtF)
+dahlquistBE_G = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtG)
 # Parareal implementation 
 F = lambda t, u, P: [res[-1] for res in dahlquistBE_F.advance_event(t,u,P)] # fine solver
 G = lambda t, u, P: [res[-1] for res in dahlquistBE_G.advance_event(t,u,P)] # Coarse solver
