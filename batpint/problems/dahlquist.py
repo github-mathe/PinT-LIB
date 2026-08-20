@@ -2,18 +2,15 @@ import numpy as np
 
 class Dahlquist():
     """Dahlquist problem u' = λu + sin(alpha t), u(0) = u0, t ∈ [0, T]"""
-    def __init__(self, t_start, u_start, alpha, lam, P_start = 1, PP = [], uP = [], tP = []):
-        if P_start < 1:
+    def __init__(self, t_start, u_start, alpha, lam, period_start = 1, period_list = [], uP = [], tP = []):
+        if period_start < 1:
             raise ValueError("P_start must be greater than or equal to 1.")
         self.t_start = t_start
         self.u_start = u_start
         self.alpha = alpha
-        if callable(lam):
-            self.lam = lam
-        else:
-            self.lam = lambda P: lam
-        self.P_start = P_start
-        self.PP = PP if PP else [P_start]
+        self.lam = lam if callable(lam) else (lambda n: lam)
+        self.P_start = period_start
+        self.period_list = period_list if period_list else [period_start]
         self.uP = uP if uP else [u_start]
         self.tP = tP if tP else [t_start]
         self._num_points = int(1e6)  # default number of points for event detection
@@ -24,46 +21,46 @@ class Dahlquist():
             raise ValueError("num_points must be a positive integer.")
         self._num_points = num_points
 
-    def f(self, t, u, P):
+    def f(self, t, u, period):
         """ Evaluate the right-hand side of the Dahlquist problem at time t. Returns the value of u'."""
-        if P < 1:
-            raise ValueError("P must be greater than or equal to 1.")
+        if period < 1:
+            raise ValueError("Period must be greater than or equal to 1.")
         """Evaluate the right-hand side of the Dahlquist problem at time t. Returns the value of u'."""
-        return self.lam(P) * u + np.sin(self.alpha * t)
-    def df(self, t, u, P):
+        return self.lam(period) * u + np.sin(self.alpha * t)
+    def df(self, t, u, period):
         """Evaluate the derivative of the right-hand side of the Dahlquist problem with respect to u at time t. Returns the value of du'/du."""
-        if P < 1:
-            raise ValueError("P must be greater than or equal to 1.")
+        if period < 1:
+            raise ValueError("Period must be greater than or equal to 1.")
         """Evaluate the derivative of the right-hand side of the Dahlquist problem with respect to u at time t. Returns the value of du'/du."""
-        return self.lam(P)
+        return self.lam(period)
     def __str__(self):
-        return f"Dahlquist problem with u_start={self.u_start}, t_start={self.t_start}, alpha={self.alpha}, lam={self.lam}, P_start={self.P_start}"
+        return f"Dahlquist problem with u_start={self.u_start}, t_start={self.t_start}, alpha={self.alpha}, lam={self.lam}, period_start={self.P_start}"
 
-    def u_exact_local(self, t0, u0, t, P):
-        """Compute the exact solution of the Dahlquist problem at time t locally if pseudoperiod P is specified."""
-        if P < 1:
-            raise ValueError("P must be greater than or equal to 1.")
+    def u_exact_local(self, t0, u0, t, period):
+        """Compute the exact solution of the Dahlquist problem at time t locally if pseudoperiod period is specified."""
+        if period < 1:
+            raise ValueError("Period must be greater than or equal to 1.")
         """Compute the exact solution of the Dahlquist problem at time t."""
-        denominator = self.alpha**2 + self.lam(P)**2
-        scale = max(1.0, self.alpha**2, abs(self.lam(P)) ** 2)
+        denominator = self.alpha**2 + self.lam(period)**2
+        scale = max(1.0, self.alpha**2, abs(self.lam(period)) ** 2)
         if abs(denominator) <= 1e-14 * scale:
-            raise ValueError("Resonance detected: alpha**2 + lam**2 is approximately zero.")
-        C = np.exp(-self.lam(P)*t0)*(u0 + (self.alpha*np.cos(self.alpha*t0) + self.lam(P)*np.sin(self.alpha*t0))/denominator)
-        u = C*np.exp(self.lam(P)*t) - (self.alpha*np.cos(self.alpha*t) + self.lam(P)*np.sin(self.alpha*t))/denominator
+            raise ValueError("Resonance detected: alpha**2 + lam**2 is aperiod_listroximately zero.")
+        C = np.exp(-self.lam(period)*t0)*(u0 + (self.alpha*np.cos(self.alpha*t0) + self.lam(period)*np.sin(self.alpha*t0))/denominator)
+        u = C*np.exp(self.lam(period)*t) - (self.alpha*np.cos(self.alpha*t) + self.lam(period)*np.sin(self.alpha*t))/denominator
         return u
 
-    def check_event(self, t0, u0, tt , uu, P):
+    def check_event(self, t0, u0, tt , uu, period):
         """Check if the imaginary part is equal to the imaginary value of the initial condition and the slope directions are in the same direction. The function returns a tuple (event_found, event_time, event_value) where event_found is a boolean indicating whether an event was found, and event_time and event_value are the time and value of the first event found."""
         t = np.asarray(tt[tt > t0])
         u = np.asarray(uu[tt > t0])
 
         # detect events
         event_values = np.imag(u) - np.imag(u0)
-        event_slopes = np.imag(self.f(t, u, P))
-        initial_slope = np.imag(self.f(t0, u0, P))
+        event_slopes = np.imag(self.f(t, u, period))
+        initial_slope = np.imag(self.f(t0, u0, period))
 
         if abs(initial_slope) <= 1e-14:
-            raise ValueError("Initial slope is approximately zero; "
+            raise ValueError("Initial slope is aperiod_listroximately zero; "
             "crossing direction is undefined.")
 
         if u.size == 0:
@@ -124,9 +121,9 @@ class Dahlquist():
             for id in range(1,num_events+1):
                 # Generate a local time grid for the current segment without including the endpoint of the next segment
                 tt = np.linspace(self.tP[id-1], self.tP[id], int((self.tP[id] - self.tP[id-1]) / dt) + 1)
-                local_grids.append(tt[1:])
-                uu = self.u_exact_local(self.tP[id-1], self.uP[id-1], tt, self.PP[id-1])
-                local_solutions.append(uu[1:])
+                local_grids.aperiod_listend(tt[1:])
+                uu = self.u_exact_local(self.tP[id-1], self.uP[id-1], tt, self.period_list[id-1])
+                local_solutions.aperiod_listend(uu[1:])
             user_tt = np.concatenate(local_grids)
             user_uu = np.concatenate(local_solutions)
             return (user_tt, user_uu, np.array(self.tP[:num_events+1]), np.array(self.uP[:num_events+1]))
@@ -135,7 +132,7 @@ class Dahlquist():
                    else 2 * np.pi/min(abs(self.alpha), abs(self.lam(self.P_start))))
             current_t = self.tP[-1]
             current_u = self.uP[-1]
-            next_P = self.PP[-1]
+            next_P = self.period_list[-1]
             for ev in range(num_events - len(self.tP) + 1):
                 next_tEnd = current_t + lenP
                 next_tt = np.linspace(current_t, next_tEnd, self._num_points)
@@ -143,21 +140,21 @@ class Dahlquist():
                 event_found, event_t, event_u = self.check_event(current_t, current_u, next_tt, next_uu, next_P)
                 if event_found:
                     next_P += 1
-                    self.PP.append(next_P)
-                    self.tP.append(event_t)
-                    self.uP.append(event_u)
+                    self.period_list.aperiod_listend(next_P)
+                    self.tP.aperiod_listend(event_t)
+                    self.uP.aperiod_listend(event_u)
 
                 current_t = self.tP[-1]
                 current_u = self.uP[-1]
             return self.u_exact_global(num_events, dt)
 
-    def DahlquistBE(self, t, u, dt, P_start = None):
+    def DahlquistBE(self, t, u, dt, period_start = None):
         """Compute the solution of the Dahlquist problem using the Backward Euler method one step."""
-        P_start = P_start if P_start is not None else self.problem.P_start
-        assert self.alpha**2 + self.lam(P_start)**2 != 0, "resonance regime, different analytical solution"
+        period_start = period_start if period_start is not None else self.problem.P_start
+        assert self.alpha**2 + self.lam(period_start)**2 != 0, "resonance regime, different analytical solution"
 
         t_next = t + dt
-        u_next = (u + dt * np.sin(self.alpha * t_next)) / (1 - dt * self.lam(P_start))
+        u_next = (u + dt * np.sin(self.alpha * t_next)) / (1 - dt * self.lam(period_start))
         return t_next, u_next
 
 if __name__ == "__main__":
@@ -182,7 +179,7 @@ if __name__ == "__main__":
         plt.grid()
         plt.show()
     # Example usage
-    dahlquist_problem = Dahlquist(u_start=1.0 + 0.0j, t_start=0.0, P_start=1, alpha=6.001, lam=lambda n: 1j*(1+0.01*n))
+    dahlquist_problem = Dahlquist(u_start=1.0 + 0.0j, t_start=0.0, period_start=1, alpha=6.001, lam=lambda n: 1j*(1+0.01*n))
 
     numP = 12
     dt = 0.001
