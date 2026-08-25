@@ -23,7 +23,7 @@ class Problem:
         Fixed parameters of the mathematical problem.
     """
 
-    def __init__(self, t0, u0, rhs, jacobian=None, event=None, **params):
+    def __init__(self, t0, u0, rhs, jacobian=None, event=None, terminate=None, **params):
         # Original initial condition of the IVP
         self.t_start = t0
         self.u_start = u0
@@ -31,7 +31,7 @@ class Problem:
         self.rhs = rhs
         self.jacobian = jacobian
         self.event = event
-
+        self.terminate = terminate
         self.params = params
 
     def __call__(self, t, u, **kwargs):
@@ -49,3 +49,9 @@ class Problem:
         if self.event is None: 
             raise ValueError("No event function defined for this problem.")
         return self.event(t, u, **self.params, **kwargs)
+
+    def termination_value(self, t, u, **kwargs):
+        """Evaluate the termination function."""
+        if self.terminate is None: 
+            return False  # No termination function defined
+        return self.terminate(t, u, **self.params, **kwargs)
