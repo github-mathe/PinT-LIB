@@ -14,11 +14,11 @@ class Problem:
     u0 : scalar or array-like
         Initial state.
     rhs : callable
-        Right-hand side f(t, u, ...).
+        Right-hand side with convention f(t, u, **kwargs).
     jacobian : callable, optional
-        Jacobian of the right-hand side.
+        Jacobian with convention J(t, u, **kwargs).
     event : callable, optional
-        Event function g(t, u, ...).
+        Event function with convention g(t, u, **kwargs).
     **params
         Fixed parameters of the mathematical problem.
     """
