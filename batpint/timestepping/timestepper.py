@@ -39,24 +39,24 @@ class TimeStepper(object):
         self.u = np.copy(u)
 
     def step(self, h=None,**kwargs):
-            """
-            Perform a single time step using the specified integration method.
-            """
-            if h is None: 
-                h = self.dt
-            jacobian = None
-            if self.problem.jacobian is not None:
-                jacobian = self.problem.jacobian_value
-            self.u = self.method.step(
-                                    rhs=self.problem,
-                                    t=self.t,
-                                    u=self.u,
-                                    h=h,
-                                    jacobian = jacobian,
-                                    **kwargs
-                                    )
-            self.t += h
-            return self.t, self.u
+        """
+        Perform a single time step using the specified integration method.
+        """
+        if h is None: 
+            h = self.dt
+        jacobian = None
+        if self.problem.jacobian is not None:
+            jacobian = self.problem.jacobian_value
+        self.u = self.method.step(
+                                rhs=self.problem,
+                                t=self.t,
+                                u=self.u,
+                                h=h,
+                                jacobian = jacobian,
+                                **kwargs
+                                )
+        self.t += h
+        return self.t, self.u
     
     def advance_to_time(self, t_end,**kwargs):
         """
@@ -73,7 +73,7 @@ class TimeStepper(object):
         Check if the event function has crossed zero.
         """
         if direction == 0:
-            return g_old * g_new < 0  # Any crossing
+            return g_old * g_new <= 0  # Any crossing
         elif direction > 0:
             return g_old < 0 and g_new >= 0  # Crossing from negative to positive
         else:
@@ -99,8 +99,6 @@ class TimeStepper(object):
             0  -> any crossing,
             1  -> negative to positive,
             -1 -> positive to negative.
-        max_steps : int, optional
-            Maximum number of time steps before aborting.
         **kwargs
             Dynamic problem data forwarded to the integration method
             and event function.
@@ -131,9 +129,9 @@ class TimeStepper(object):
 
                 # Linear interpolation to approximate event point
                 t_event, u_event = self._interpolate_event(t_old, u_old, self.t, self.u, g_old, g_new)
-                g_new = self.problem.event_value(t_event, u_event, **kwargs)
+                g_event = self.problem.event_value(t_event, u_event, **kwargs)
 
-                if abs(g_new) > self.event_tol:
+                if abs(g_event) > self.event_tol:
                     raise RuntimeError("Event not localized within the specified tolerance.")
 
                 self.t = t_event
@@ -155,7 +153,6 @@ class TimeStepperPropagator(Propagator):
         self.timestepper.set_state(t, u)
         return self.timestepper.advance_to_event(direction=self.direction, **kwargs)
 
-
 if __name__ == "__main__":
     from batpint.time_integration.backwardeuler import BackwardEuler
     from batpint.time_integration.newton import Newton
@@ -174,6 +171,8 @@ if __name__ == "__main__":
     def event(t, u, u_start, **kwargs):
         return np.imag(u) - np.imag(u_start)
 
+    def terminate(t, u, cycle, alpha, lam, **kwargs):
+        return abs(alpha**2 - abs(lam(cycle))**2) < 1e-10
     # ============================================================
     # Initial data
     # ============================================================
@@ -181,8 +180,8 @@ if __name__ == "__main__":
     t_start = 0.0
     u_start = 1.0 + 0.0j
     period_start = 1
-    alpha = 6.001 #1.1 
-    dt = 0.000001
+    alpha = 6.001 #
+    dt = 0.001
     # ============================================================
     # Create problem
     # ============================================================
@@ -194,6 +193,7 @@ if __name__ == "__main__":
         event=event,
         alpha=alpha,
         lam=lam,
+        terminate=terminate
     )
     # ============================================================
     # Create TimeStepper
@@ -216,17 +216,16 @@ if __name__ == "__main__":
     # ============================================================
     # Compute pseudoperiod points
     # ============================================================
-    N = 2
+    N = 20
     TP = np.zeros(N + 1)
     UP = np.zeros(N + 1, dtype=complex)
     TP[0] = t_start
     UP[0] = u_start
     for j in range(N):
-        cycle = period_start + j
-        terminate = abs(lam(cycle))**2 - alpha**2 == 0
-        if terminate:
-            print(f"Terminating at cycle {cycle} due to singularity.")
+        if problem.termination_value(TP[j], UP[j], cycle=period_start + j):
+            print(f"Termination condition met at period {period_start + j}. Stopping propagation.")
             break
+        cycle = period_start + j
         TP[j + 1], UP[j + 1] = propagator.propagate(
             TP[j],
             UP[j],
