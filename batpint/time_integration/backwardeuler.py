@@ -1,13 +1,15 @@
 import numpy as np
-from base_method import IntegrationMethod
+from batpint.time_integration.base_method import IntegrationMethod
 
 class BackwardEuler(IntegrationMethod):
     """
     Backward Euler method for solving ODEs of the form dy/dt = rhs(t,y)
     """
+
     def __init__(self, algebraic_solver):
         self.algebraic_solver = algebraic_solver
-    def step(self,rhs, t, u, h, jacobian=None, **kwargs):
+
+    def step(self, rhs, t, u, h, jacobian=None, **kwargs):
         """
         Perform a single Backward Euler step.
         
@@ -20,22 +22,29 @@ class BackwardEuler(IntegrationMethod):
             Current state vector.
         h : float
             Time step size.
-        
+        jacobian : callable, optional
+            Jacobian J_f(t, u, ...) of the right-hand side.
+        **kwargs
+            Additional dynamic problem data forwarded to the right-hand
+            side and Jacobian evaluations.
+
         Returns:
-        np.ndarray
-            The state vector after one Backward Euler step.
+        -------
+        scalar or array-like
+            Approximation u_{n+1} at time t + h.
         """
         t_new = t + h
+
         # Define the residual function for the implicit equation
         def residual(u_new):
-            return u_new - u - h * rhs(t_new, u_new)
+            return u_new - u - h * rhs(t_new, u_new,**kwargs)
+        residual_jacobian = None
         if jacobian is not None:
             def residual_jacobian(u_new):
-                if np.isscalar(u_new):
-                    return 1 - h * jacobian(t_new, u_new)
-                else:
-                    return np.eye(len(u_new)) - h * jacobian(t_new, u_new)
-            kwargs['residual_jacobian'] = residual_jacobian         
-        x0 = u  # Initial guess for the new state
+                Jf = jacobian(t_new, u_new, **kwargs)
+                if np.ndim(Jf) == 0:
+                    return 1.0 - h * Jf
+                return np.eye(Jf.shape[0]) - h * Jf      
+
         # Use the algebraic solver to solve for u_new
-        return self.algebraic_solver.solve(residual, x0, **kwargs)
+        return self.algebraic_solver.solve(residual, x0=np.copy(u),residual_jacobian=residual_jacobian)
