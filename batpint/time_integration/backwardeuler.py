@@ -9,7 +9,7 @@ class BackwardEuler(IntegrationMethod):
     def __init__(self, algebraic_solver):
         self.algebraic_solver = algebraic_solver
 
-    def step(self, rhs, t, u, h, jacobian=None, **kwargs):
+    def step(self, rhs, t, u, h, jacobian=None):
         """
         Perform a single Backward Euler step.
         
@@ -37,11 +37,11 @@ class BackwardEuler(IntegrationMethod):
 
         # Define the residual function for the implicit equation
         def residual(u_new):
-            return u_new - u - h * rhs(t_new, u_new,**kwargs)
+            return u_new - u - h * rhs(t_new, u_new)
         residual_jacobian = None
         if jacobian is not None:
             def residual_jacobian(u_new):
-                Jf = jacobian(t_new, u_new, **kwargs)
+                Jf = jacobian(t_new, u_new)
                 if np.ndim(Jf) == 0:
                     return 1.0 - h * Jf
                 return np.eye(Jf.shape[0]) - h * Jf      
