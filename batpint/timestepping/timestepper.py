@@ -1,7 +1,8 @@
+from dataclasses import dataclass
 import numpy as np
 from batpint.parareal.base_propagator import Propagator
 
-class TimeStepper(object):
+class TimeStepper:
     """
     Controls time integration and event detection for an IVP.
 
@@ -18,53 +19,50 @@ class TimeStepper(object):
         Default time-step size.
     event_tol : float, optional
         Tolerance used for event localization.
+    current_params : Parameters, optional
+        Current values of the problem parameters.
     """
     
-    def __init__(self, problem, method, dt, event_tol=1e-6):
+    def __init__(self, problem, method, dt, event_tol=1e-6, current_params=None):
         self.problem = problem
         self.method = method
 
         self.dt = dt  # Default time step
         self.event_tol = event_tol  # Tolerance for event detection
 
-        # the current numerical state
-        self.t = problem.t_start
-        self.u = np.copy(problem.u_start)
+        if current_params is None:
+            self.current_params = problem.params
+        else:
+            self.current_params = current_params
 
-    def set_state(self, t, u):
-        """
-        Set the current numerical state.
-        """
-        self.t = t
-        self.u = np.copy(u)
+        self.rhs = lambda t, u: self.problem(t, u, self.current_params)
 
-    def step(self, h=None,**kwargs):
-        """
-        Perform a single time step using the specified integration method.
-        """
-        if h is None: 
-            h = self.dt
-        jacobian = None
+        self.jacobian = None
         if self.problem.jacobian is not None:
-            jacobian = self.problem.jacobian_value
-        self.u = self.method.step(
-                                rhs=self.problem,
-                                t=self.t,
-                                u=self.u,
-                                h=h,
-                                jacobian = jacobian,
-                                **kwargs
-                                )
+            self.jacobian = lambda t, u: self.problem.jacobian_value(t, u, self.current_params)
+
+        self.event = None
+        if self.problem.event is not None:
+            self.event = lambda t, u: self.problem.event_value(t, u, self.current_params)
+
+        self.terminate = None
+        if self.problem.terminate is not None:
+            self.terminate = lambda t, u: self.problem.termination_value(t, u, self.current_params)
+
+    def step(self, h=None):
+        if h is None:
+            h = self.dt
+        self.u = self.method.step(rhs=self.rhs, t=self.t, u=self.u, h=h, jacobian=self.jacobian)
         self.t += h
         return self.t, self.u
     
-    def advance_to_time(self, t_end,**kwargs):
+    def advance_to_time(self, t_end):
         """
         Advance the solution to a specified end time.
         """
         while self.t < t_end:
             h = min(self.dt, t_end - self.t)  # Adjust step size if close to t_end
-            self.step(h=h,**kwargs)
+            self.step(h=h)
         return self.t, self.u
 
     @staticmethod
@@ -88,7 +86,7 @@ class TimeStepper(object):
 
         return t_event, u_event
             
-    def advance_to_event(self, direction=0, **kwargs):
+    def advance_to_event(self, direction=0):
         """
         Advance the solution until the next admissible event crossing.
 
@@ -99,37 +97,31 @@ class TimeStepper(object):
             0  -> any crossing,
             1  -> negative to positive,
             -1 -> positive to negative.
-        **kwargs
-            Dynamic problem data forwarded to the integration method
-            and event function.
         Returns
         -------
         t_event, u_event
             Approximate time and state at the detected event.
         """
 
-        g_old = self.problem.event_value(self.t, self.u, **kwargs)
+        g_old = self.event(self.t, self.u)
 
         # If the current state is already on the event surface,
         # move away from it before searching for the next event.
         if abs(g_old) <= self.event_tol:
-            self.step(**kwargs)
-            g_old = self.problem.event_value(self.t, self.u, **kwargs)
+            self.step()
+            g_old = self.event(self.t, self.u)
 
         while True:
 
             t_old = self.t
             u_old = np.copy(self.u)
-
-            self.step(**kwargs)
-
-            g_new = self.problem.event_value(self.t, self.u, **kwargs)
-
+            self.step()
+            g_new = self.event(self.t, self.u)
             if self._event_crossed(g_old, g_new, direction):
 
                 # Linear interpolation to approximate event point
                 t_event, u_event = self._interpolate_event(t_old, u_old, self.t, self.u, g_old, g_new)
-                g_event = self.problem.event_value(t_event, u_event, **kwargs)
+                g_event = self.event(t_event, u_event)
 
                 if abs(g_event) > self.event_tol:
                     raise RuntimeError("Event not localized within the specified tolerance.")
@@ -149,66 +141,66 @@ class TimeStepperPropagator(Propagator):
         self.timestepper = timestepper
         self.direction = direction
 
-    def propagate(self, t, u,**kwargs):
-        self.timestepper.set_state(t, u)
-        return self.timestepper.advance_to_event(direction=self.direction, **kwargs)
+    def propagate(self):
+        self.timestepper.t = self.timestepper.current_params.get("t_start")
+        self.timestepper.u = self.timestepper.current_params.get("u_start")
+        return self.timestepper.advance_to_event(direction=self.direction)
 
 if __name__ == "__main__":
     from batpint.time_integration.backwardeuler import BackwardEuler
     from batpint.time_integration.newton import Newton
-    from batpint.problems.base_problem import Problem
+    from batpint.problems.base_problem import Problem, Parameters, Parameter, CurrentParameters
 
+    # ============================================================
     # Dahlquist-type pseudoperiodic problem
-    def lam(n):
-        return 1j * (1.0 + 0.01 * n)
+    # ============================================================
 
-    def rhs(t, u, alpha, lam, cycle, **kwargs):
-        return lam(cycle) * u + np.sin(alpha * t)
+    def lam(t, u, cycle):
+        return 1j * (1.0 + 0.01 * cycle)
 
-    def jacobian(t, u, alpha, lam, cycle, **kwargs):
-        return lam(cycle)
+    def rhs(t, u, alpha, lam):
+        return lam * u + np.sin(alpha * t)
 
-    def event(t, u, u_start, **kwargs):
+    def jacobian(t, u, lam):
+        return lam
+
+    def event(t, u, u_start):
         return np.imag(u) - np.imag(u_start)
 
-    def terminate(t, u, cycle, alpha, lam, **kwargs):
-        return abs(alpha**2 - abs(lam(cycle))**2) < 1e-10
-    # ============================================================
-    # Initial data
-    # ============================================================
+    def terminate(t, u, alpha, lam):
+        return abs(alpha**2 - abs(lam)**2) < 1e-10
 
-    t_start = 0.0
-    u_start = 1.0 + 0.0j
-    period_start = 1
-    alpha = 6.001 #
-    dt = 0.001
-    # ============================================================
-    # Create problem
-    # ============================================================
+    params = Parameters(
+    Parameter("alpha", value=6.001),
+    Parameter("cycle", value=1),
+    Parameter("t_start", value=0.0),
+    Parameter("u_start", value=1.0 + 0.0j),
+    Parameter("lam", function=lam),
+    Parameter("period_start", value=1)
+    )
+    dt = 0.1
+
     problem = Problem(
-        t0=t_start,
-        u0=u_start,
-        rhs=rhs,
-        jacobian=jacobian,
-        event=event,
-        alpha=alpha,
-        lam=lam,
-        terminate=terminate
-    )
-    # ============================================================
-    # Create TimeStepper
-    # ============================================================
+    t0=0.0,
+    u0=1.0 + 0.0j,
+    rhs=rhs,
+    params=params,
+    jacobian=jacobian,
+    event=event,
+    terminate=terminate)
+
+    current_params = CurrentParameters(problem.params)
+
     method = BackwardEuler(
-        Newton()
+    Newton()
     )
+
     timestepper = TimeStepper(
         problem=problem,
         method=method,
         dt=dt,
+        current_params=current_params,
     )
-    # ============================================================
-    # Create propagator
-    # ============================================================
     propagator = TimeStepperPropagator(
         timestepper=timestepper,
         direction=1,
@@ -216,25 +208,35 @@ if __name__ == "__main__":
     # ============================================================
     # Compute pseudoperiod points
     # ============================================================
+
     N = 20
+
     TP = np.zeros(N + 1)
     UP = np.zeros(N + 1, dtype=complex)
-    TP[0] = t_start
-    UP[0] = u_start
+
+    TP[0] = Parameters.get("t_start").value
+    UP[0] = Parameters.get("u_start").value
+
     for j in range(N):
-        if problem.termination_value(TP[j], UP[j], cycle=period_start + j):
-            print(f"Termination condition met at period {period_start + j}. Stopping propagation.")
+
+        cycle = Parameters.get("period_start").value + j
+
+        current_params.set("cycle", cycle)
+        current_params.set("t_start", TP[j])
+        current_params.set("u_start", UP[j])
+
+        if timestepper.terminate(TP[j], UP[j]):
+            print(
+                f"Termination condition met at period "
+                f"{cycle}. Stopping propagation."
+            )
             break
-        cycle = period_start + j
-        TP[j + 1], UP[j + 1] = propagator.propagate(
-            TP[j],
-            UP[j],
-            cycle=cycle,
-            u_start=UP[j],
-            t_start=TP[j])
+
+        TP[j + 1], UP[j + 1] = propagator.propagate()
+
         print(
             f"period = {cycle:2d}, "
-            f"lambda = {lam(cycle)}, "
+            f"lambda = {current_params.get('lam', TP[j], UP[j])}, "
             f"t = {TP[j + 1]:.8f}, "
             f"u = {UP[j + 1]}"
         )
