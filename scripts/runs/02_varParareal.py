@@ -8,7 +8,7 @@ from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact
 t_start = 0
 u_start = 1+0j
 pStart = 1
-dtNum = 0.0001
+dtNum = 0.01
 dtEx = 0.0001
 
 # define lam and alpha
@@ -82,10 +82,65 @@ def solve_dahlquist(dt, num_events, method, save_history=True):
         
     return np.asarray(t_all), np.asarray(u_all), np.asarray(t_ev), np.asarray(u_ev)
 
-num_events = 1 # number of cycles
+num_events = 5 # number of cycles
     
 tNum, uNum, t_evNum, u_evNum = solve_dahlquist(dt=dtNum, num_events=num_events, method=methodNum, save_history=True)
 tEx, uEx, t_evEx, u_evEx = solve_dahlquist(dt=dtEx, num_events=num_events, method=methodEx, save_history=True)
 
 #%%
-    
+# Plotting the results
+plt.plot(uNum.real, uNum.imag, label="Numerical")
+plt.plot(uEx.real, uEx.imag, "--", label="Analytical")
+plt.plot(u_evNum.real, u_evNum.imag, 'o', label=r"$u_{\mathrm{ev}}$ (Numerical)")
+plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid();
+
+# %%
+# error analysis
+dtVals =  1./(10**np.arange(1,6))
+error_t_ev = np.zeros_like(dtVals)
+error_u_ev = np.zeros_like(dtVals)
+
+for i,dt in enumerate(dtVals):
+    tNum, uNum, t_evNum, u_evNum = solve_dahlquist(dt=dt, num_events=num_events, method=methodNum, save_history=True)
+    tEx, uEx, t_evEx, u_evEx = solve_dahlquist(dt=dt, num_events=num_events, method=methodEx, save_history=True)
+    error_t_ev[i] = np.max(np.abs(t_evNum - t_evEx))
+    error_u_ev[i] = np.max(np.abs(u_evNum - u_evEx))
+    print(f"dt = {dt}, error_t_ev = {error_t_ev[i]}, error_u_ev = {error_u_ev[i]}")
+# Plotting the error
+plt.figure()
+
+plt.loglog(
+    dtVals,
+    error_t_ev,
+    "--o",
+    label=r"$\|t_{\mathrm{ev}}^{\mathrm{ex}}"
+          r"-t_{\mathrm{ev}}^{\mathrm{num}}\|_\infty$",
+)
+
+plt.loglog(
+    dtVals,
+    error_u_ev,
+    "-*",
+    label=r"$\|u_{\mathrm{ev}}^{\mathrm{ex}}"
+          r"-u_{\mathrm{ev}}^{\mathrm{num}}\|_\infty$",
+)
+
+plt.xlabel(r"$\Delta t$")
+plt.ylabel(r"$L_\infty$ error")
+
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
+# %%
+# Adaptive Parareal
+
+N = num_events # time windows - coarse time grid
+K = N+1 # Parareal iterations
+dtF = 1/1000 # Fine solver's time steps
+dtG = 1/100  # Coarse solver's time steps
+
+timestepperF = TimeStepper(problem=problem, method=methodNum, dt=dtF, save_history=False)
+timestepperG = TimeStepper(problem=problem, method=methodNum, dt=dtG, save_history=False)
+propagatorF = TimeStepperPropagator(timestepper=timestepperF, direction=1)
+propagatorG = TimeStepperPropagator(timestepper=timestepperG, direction=1)
