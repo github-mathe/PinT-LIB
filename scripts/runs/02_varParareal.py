@@ -1,112 +1,91 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from batpint.problems.dahlquist import Dahlquist
-from batpint.solvers.timestepper import TimeStepper
-from batpint.solvers.parareal import PararealModified
+from batpint.timestepping import timestepper
+from batpint.timestepping.timestepper import TimeStepper, TimeStepperPropagator
+from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact
 
 # Dahlquist test problem parameters
-eps = lambda n: 0.01*n
-lam = lambda n: 1j*(1 + eps(n))
-t0 = 0
-alpha = 6.001   # to avoid resonance regime
-u0 = 1+0j
+t_start = 0
+u_start = 1+0j
 pStart = 1
-numP = 12
+dtNum = 0.0001
+dtEx = 0.0001
 
-# Time discretization parameters 
-dtEx = 0.001
-dtNum = 0.01
+# define lam and alpha
+def lam(cycle):
+    return 1j*(1 + 0.01*cycle)
+alpha = 6.001   # to avoid resonance regime
 
-dahlquist = Dahlquist(u_start=u0, t_start=t0, period_start=pStart, alpha=alpha, lam=lam)
-tTh, uTh, tpTh, upTh = dahlquist.u_exact_global(numP, dtEx)
-solver = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtNum)
-tNum, uNum, tpNum, upNum = solver.solve(num_events=numP)
-# Plotting the results
-plt.plot(uNum.real, uNum.imag, label="Numerical")
-plt.plot(uTh.real, uTh.imag, "--", label="Analytical")
-plt.plot(upNum.real, upNum.imag, 'o', label="upNum")
-plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid();
+# define event and termination functions
+def event(t, u, u_event):
+    return np.imag(u) - np.imag(u_event)
 
-# error analysis
-dtVals =  1./(10**np.arange(5))
-error_tP = np.zeros_like(dtVals)
-error_uP = np.zeros_like(dtVals)
+def terminate(t, u, alpha, lam, cycle):
+    return abs(alpha**2 + lam(cycle)**2) < 1e-10
 
-for i,dt in enumerate(dtVals):
-    error_tP[i], error_uP[i] = solver.compute_event_error(num_events=numP, dt=dt, exact_solver=dahlquist.u_exact_global)
-    print(f"dt = {dt}, error_tP = {error_tP[i]}, error_uP = {error_uP[i]}")
-# Plotting the error
-plt.figure()
-plt.loglog(dtVals, error_tP, "--", c="gray", label=r"$\|tp_{ex} -tp_{num}\|_\infty$ error")
-plt.loglog(dtVals, error_uP, "-*", c="gray", label=r"$\|up_{ex} -up_{num}\|_\infty$ error")
-plt.xlabel("$dt$"), plt.ylabel("Error"), plt.grid();plt.legend()
-plt.draw()
-plt.show()
+# Create Dahlquist problem and Backward Euler method
+problem = Dahlquist(t_start=t_start, u_start=u_start, lam=lam, alpha=alpha, cycle=pStart,u_event=u_start, event=event, terminate=terminate)
+def reset():
+    problem.params['cycle'] = pStart
+    problem.params['t_start'] = t_start
+    problem.params['u_start'] = u_start
 
-# Adaptive Parareal
+methodNum = DahlquistBE(problem.params)
+methodEx = DahlquistExact(problem.params)
 
-N = numP # time windows - coarse time grid
-K = N+1 # Parareal iterations
-dtF = 1/1000 # Fine solver's time steps
-dtG = 1/100  # Coarse solver's time steps
-dahlquistBE_F = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtF)
-dahlquistBE_G = TimeStepper(problem = dahlquist, method = dahlquist.DahlquistBE , dt = dtG)
-# Parareal implementation 
-F = lambda t, u, P: [res[-1] for res in dahlquistBE_F.advance_event(t,u,P)] # fine solver
-G = lambda t, u, P: [res[-1] for res in dahlquistBE_G.advance_event(t,u,P)] # Coarse solver
-tpPara, upPara = PararealModified(F, G,dahlquist.t_start, dahlquist.u_start, N, K)
+# solve the problem
+def solve_dahlquist(dt, num_events, method, save_history=True):
+    """
+    solve_dahlquist solves the Dahlquist problem using the specified time stepper method.
+    Args:
+        dt (float): time step size
+        num_events (int): number of events to simulate
+        method (TimeStepper): time stepping method to use
+        save_history (bool, optional): whether to save the history of the time stepping. Defaults to True.
 
-# compare with fine exact solution
-tFine,uFine,tpFine, upFine = dahlquistBE_F.solve(num_events=N)
-dtF_index = np.where(dtVals == dtF)[0][0]
-thres_tp = error_tP[dtF_index]                   # threshold for time error between analytical and fine numerical
-thres_up = error_uP[dtF_index]  
-error_tp_per_window = np.zeros((K, N+1), dtype=float)
-error_up_per_window = np.zeros((K, N+1), dtype=float)
-for k in range(K):
-    error_tp_per_window[k,:] = np.abs(tpPara[k,:]-tpFine)
-    error_up_per_window[k,:] = np.abs(upPara[k,:]-upFine)
-error_tp_per_iteration = np.max(error_tp_per_window, axis=1)
-error_up_per_iteration = np.max(error_up_per_window, axis=1)
+    Returns:
+        tuple: (t_all, u_all, t_ev, u_ev) where t_all and u_all are the time and solution arrays for the entire simulation, 
+        and t_ev and u_ev are the time and solution arrays at the event points.
+    """
+    reset()
 
-#plotting the error per iteration
-fig = plt.figure(figsize=(12, 8))
-fig.suptitle(f"Adaptive Parareal Error for N={N+1}")
-plt.subplot(1,2, 1)
-plt.semilogy(range(K), error_tp_per_iteration, label=r'$\|tp_{Parareal} - tp_{FineNum}\|_\infty$')
-plt.axhline(y=thres_tp, color='red', linestyle='--', label="Fine solver error")
-plt.xticks(range(K))
-plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
-plt.legend()
+    timestepper = TimeStepper(problem=problem, method=method, dt=dt, save_history=save_history)
+    propagator = TimeStepperPropagator(timestepper=timestepper, direction=1)
 
-plt.subplot(1,2, 2)
-plt.semilogy(range(K), error_up_per_iteration, label=r'$\|up_{Parareal} - up_{FineNum}\|_\infty$')
-plt.axhline(y=thres_up, color='red', linestyle='--', label="Fine solver error")
-plt.xticks(range(K))
-plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
-plt.legend()  
-plt.tight_layout()  
+    t_ev = np.zeros(num_events+1)
+    t_ev[0] = problem.t_start
+    u_ev = np.zeros(num_events+1, dtype=complex)
+    u_ev[0] = problem.u_start
+    
+    t_all = [problem.t_start]
+    u_all = [problem.u_start]
+    
+    for ev in range(num_events):
+        if problem.termination_value(t_ev[ev], u_ev[ev]):
+            break
+        
+        t_new, u_new = propagator.propagate(t_ev[ev], u_ev[ev])
+        t_ev[ev + 1] = t_new
+        u_ev[ev + 1] = u_new
+        
+        # extract solution for the current cycle
+        t_local = np.asarray(propagator.history['t'])
+        u_local = np.asarray(propagator.history['u'])
+        
+        # save the solution for the current cycle
+        t_all.extend(t_local[1:])
+        u_all.extend(u_local[1:])
+        
+        problem.params['cycle'] += 1
+        problem.params['t_event'] = t_new
+        problem.params['u_event'] = u_new
+        
+    return np.asarray(t_all), np.asarray(u_all), np.asarray(t_ev), np.asarray(u_ev)
 
-# plotting the error vs N points
-fig = plt.figure(figsize=(12, 8))
-fig.suptitle(f"Adaptive Parareal Error for N={N+1}")
-plt.subplot(1,2, 1)
-for k in range(K):
-    plt.semilogy(range(N+1), error_tp_per_window[k,:], label=f"k={k}")
-plt.axhline(y=thres_tp, color='red', linestyle='--', label="Fine solver error")
-plt.xticks(range(N+1))
-plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
+num_events = 1 # number of cycles
+    
+tNum, uNum, t_evNum, u_evNum = solve_dahlquist(dt=dtNum, num_events=num_events, method=methodNum, save_history=True)
+tEx, uEx, t_evEx, u_evEx = solve_dahlquist(dt=dtEx, num_events=num_events, method=methodEx, save_history=True)
 
-
-plt.subplot(1,2, 2)
-for k in range(K):
-    plt.semilogy(range(N+1), error_up_per_window[k,:], label=f"k={k}")
-plt.axhline(y=thres_up, color='red', linestyle='--', label="Fine solver error")
-plt.xticks(range(N+1))
-plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
-plt.tight_layout()
+#%%
     
