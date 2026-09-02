@@ -4,11 +4,11 @@ import numpy as np
 class Problem:
     """
     The problem (IVP) is defined by
-        du/dt = f(t, u, cycle), u(t0) = u0.
+        du/dt = f(t, u,...), u(t0) = u0.
     Optional functions may be supplied for the Jacobian of the
     right-hand side and for event detection.
     All problem functions must begin with the arguments
-        (t, u, cycle)
+        (t, u,...)
     Additional keyword arguments passed at construction are stored
     as fixed problem parameters "params".
     
@@ -24,11 +24,13 @@ class Problem:
         Jacobian with convention J(t, u, **kwargs).
     event : callable, optional
         Event function with convention g(t, u, **kwargs).
+    terminate_step : callable, optional
+        Function to determine if the integration should terminate at a given step.
     **params
         Fixed parameters of the mathematical problem.
     """
 
-    def __init__(self, t_start, u_start, rhs, jacobian=None, event=None, terminate=None, **params):
+    def __init__(self, t_start, u_start, rhs, jacobian=None, event=None, terminate_step=None, **params):
         # Original initial condition of the IVP
         self.t_start = t_start
         self.u_start = u_start
@@ -36,63 +38,23 @@ class Problem:
         self.rhs = rhs
         self.jacobian = jacobian
         self.event = event
-        self.terminate = terminate
+        self.terminate_step = terminate_step
         self.params = params
 
         self.rhs_params = self._get_params(rhs)
         self.jacobian_params = self._get_params(jacobian)
         self.event_params = self._get_params(event)
-        self.terminate_params = self._get_params(terminate)
+        self.terminate_step_params = self._get_params(terminate_step)
 
     @staticmethod
     def _get_params(func):
         
         if func is None:
             return ()
+        
         names = tuple(inspect.signature(func).parameters)
         
-        if names[:3] != ("t", "u", "cycle"):
-            raise ValueError("Problem functions must start with arguments (t, u, cycle).")
+        if names[:2] != ("t", "u"):
+            raise ValueError("Problem functions must start with arguments (t, u).")
 
-        return names[3:]
-    
-    def __call__(self, t, u, cycle):
-        """
-        Evaluate the right-hand side f(t, u, cycle).
-        """
-        
-        kwargs = {name: self.params[name] for name in self.rhs_params}
-        return self.rhs(t, u, cycle, **kwargs)
-
-    def jacobian_value(self, t, u, cycle):
-        """
-        Evaluate the Jacobian of the right-hand side.
-        """
-        
-        if self.jacobian is None: 
-            raise ValueError("No Jacobian function defined for this problem.")
-        
-        kwargs = {name: self.params[name] for name in self.jacobian_params}
-        return self.jacobian(t, u, cycle, **kwargs)
-
-    def event_value(self, t, u, cycle):
-        """
-        Evaluate the event function g(t, u).
-        """
-        
-        if self.event is None: 
-            raise ValueError("No event function defined for this problem.")
-        
-        kwargs = {name: self.params[name] for name in self.event_params}
-        return self.event(t, u, cycle, **kwargs)
-
-    def termination_value(self, t, u, cycle):
-        """
-        Evaluate the termination function.
-        """
-        
-        if self.terminate is None: 
-            return False  # No termination function defined
-        
-        kwargs = {name: self.params[name] for name in self.terminate_params}
-        return self.terminate(t, u, cycle, **kwargs)
+        return names[2:]
