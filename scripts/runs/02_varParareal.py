@@ -186,4 +186,4 @@ plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
 plt.tight_layout()
-# %%
+plt.show()
