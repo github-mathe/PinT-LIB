@@ -4,11 +4,13 @@ import numpy as np
 class Problem:
     """
     The problem (IVP) is defined by
-        du/dt = f(t, u), u(t0) = u0.
+        du/dt = f(t, u, cycle), u(t0) = u0.
     Optional functions may be supplied for the Jacobian of the
     right-hand side and for event detection.
+    All problem functions must begin with the arguments
+        (t, u, cycle)
     Additional keyword arguments passed at construction are stored
-    as fixed problem parameters.
+    as fixed problem parameters "params".
     
     Parameters
     ----------
@@ -49,20 +51,20 @@ class Problem:
             return ()
         names = tuple(inspect.signature(func).parameters)
         
-        if names[:2] != ("t", "u"):
-            raise ValueError("Problem functions must start with arguments (t, u).")
+        if names[:3] != ("t", "u", "cycle"):
+            raise ValueError("Problem functions must start with arguments (t, u, cycle).")
 
-        return names[2:]
+        return names[3:]
     
-    def __call__(self, t, u):
+    def __call__(self, t, u, cycle):
         """
-        Evaluate the right-hand side f(t, u).
+        Evaluate the right-hand side f(t, u, cycle).
         """
         
         kwargs = {name: self.params[name] for name in self.rhs_params}
-        return self.rhs(t, u, **kwargs)
+        return self.rhs(t, u, cycle, **kwargs)
 
-    def jacobian_value(self, t, u):
+    def jacobian_value(self, t, u, cycle):
         """
         Evaluate the Jacobian of the right-hand side.
         """
@@ -71,9 +73,9 @@ class Problem:
             raise ValueError("No Jacobian function defined for this problem.")
         
         kwargs = {name: self.params[name] for name in self.jacobian_params}
-        return self.jacobian(t, u, **kwargs)
+        return self.jacobian(t, u, cycle, **kwargs)
 
-    def event_value(self, t, u):
+    def event_value(self, t, u, cycle):
         """
         Evaluate the event function g(t, u).
         """
@@ -82,9 +84,9 @@ class Problem:
             raise ValueError("No event function defined for this problem.")
         
         kwargs = {name: self.params[name] for name in self.event_params}
-        return self.event(t, u, **kwargs)
+        return self.event(t, u, cycle, **kwargs)
 
-    def termination_value(self, t, u):
+    def termination_value(self, t, u, cycle):
         """
         Evaluate the termination function.
         """
@@ -93,4 +95,4 @@ class Problem:
             return False  # No termination function defined
         
         kwargs = {name: self.params[name] for name in self.terminate_params}
-        return self.terminate(t, u, **kwargs)
+        return self.terminate(t, u, cycle, **kwargs)
