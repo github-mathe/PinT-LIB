@@ -1,5 +1,5 @@
 import numpy as np
-from batpint.parareal.base_propagator import Propagator
+import copy
 
 class TimeStepper:
     """
@@ -25,43 +25,83 @@ class TimeStepper:
     def __init__(self, problem, method, dt, event_tol=1e-6, save_history=False):
         self.problem = problem
         self.method = method
-
         self.dt = dt  # Default time step
         self.event_tol = event_tol  # Tolerance for event detection
-
+        self.state = None
+        self.save_history = save_history
         self.history = {"t": [], "u": []} if save_history else None
-        
+
     def reset_history(self):
-        """
-        Reset the history of time and state.
-        """
-        if self.history is None:
-            return
-        self.history["t"] = [self.t]
-        self.history["u"] = [np.copy(self.u)]
-        
+        if self.save_history:
+            self.history["t"] = [self.state.t]
+            self.history["u"] = [copy.deepcopy(self.state.u)]
+
+    def set_state(self, state):
+        self.state = copy.deepcopy(state)
+        self.state.terminated_step = False
+        self.reset_history()
+
+    def _resolve_params(self, names):
+        kwargs = {}
+        for name in names:
+            if hasattr(self.state, name):
+                kwargs[name] = getattr(self.state, name)
+            elif name in self.problem.params:
+                kwargs[name] = self.problem.params[name]
+            else:
+                raise KeyError(f"Parameter '{name}' could not be resolved.")
+        return kwargs
+
+    # wrapper for problem functions to include cycle and other parameters
+    def rhs(self, t, u):
+        kwargs = self._resolve_params(self.problem.rhs_params)
+        return self.problem.rhs(t, u, **kwargs)
+    
+    def jacobian(self, t, u):
+        if self.problem.jacobian is None:
+            return None
+        kwargs = self._resolve_params(self.problem.jacobian_params)
+        return self.problem.jacobian(t, u, **kwargs)
+
+    def event(self, t, u):
+        kwargs = self._resolve_params(self.problem.event_params)
+        return self.problem.event(t, u, **kwargs)
+
+    def terminate_step(self, t, u):
+        if self.problem.terminate_step is None:
+            return False
+        kwargs = self._resolve_params(self.problem.terminate_step_params)
+        return self.problem.terminate_step(t, u, **kwargs)
+    
     def step(self, h=None):
-        
         if h is None:
             h = self.dt
-        jacobian = self.problem.jacobian_value if self.problem.jacobian is not None else None
-        self.u = self.method.step(rhs=self.problem, t=self.t, u=self.u, h=h, jacobian=jacobian)
-        self.t += h
-        
-        if self.history is not None:
-            self.history["t"].append(self.t)
-            self.history["u"].append(np.copy(self.u))
-        
-        return self.t, self.u
+        jacobian = self.jacobian if self.problem.jacobian else None
+        method_kwargs = self._resolve_params(self.method.step_params)
+        self.state.u = self.method.step(rhs=self.rhs, t=self.state.t, u=self.state.u, h=h, jacobian=jacobian, **method_kwargs)
+        self.state.t += h
+
+        if self.save_history:
+            self.history["t"].append(self.state.t)
+            self.history["u"].append(copy.deepcopy(self.state.u))
+
+        self.state.terminated_step = self.terminate_step(self.state.t, self.state.u)
+
+        if self.state.terminated_step:
+            raise RuntimeError(
+                f"STEP_TERMINATION: cycle={self.state.cycle}, "
+                f"t={self.state.t}, u={self.state.u}"
+            )
+        return self.state
     
     def advance_to_time(self, t_end):
         """
         Advance the solution to a specified end time.
         """
-        while self.t < t_end:
-            h = min(self.dt, t_end - self.t)  # Adjust step size if close to t_end
+        while self.state.t < t_end:
+            h = min(self.dt, t_end - self.state.t)  # Adjust step size if close to t_end
             self.step(h=h)
-        return self.t, self.u
+        return self.state
 
     @staticmethod
     def _event_crossed(g_old, g_new, direction):
@@ -100,56 +140,36 @@ class TimeStepper:
         t_event, u_event
             Approximate time and state at the detected event.
         """
-
-        g_old = self.problem.event_value(self.t, self.u)
+        if self.problem.event is None:
+            raise ValueError("No event function defined for this problem.")
+        g_old = self.event(self.state.t, self.state.u)
 
         # If the current state is already on the event surface,
         # move away from it before searching for the next event.
         if abs(g_old) <= self.event_tol:
             self.step()
-            g_old = self.problem.event_value(self.t, self.u)
+            g_old = self.event(self.state.t, self.state.u)
 
         while True:
-            t_old = self.t
-            u_old = np.copy(self.u)
+            t_old = self.state.t
+            u_old = copy.deepcopy(self.state.u)
             self.step()
-            g_new = self.problem.event_value(self.t, self.u)
+            g_new = self.event(self.state.t, self.state.u)
             if self._event_crossed(g_old, g_new, direction):
-
                 # Linear interpolation to approximate event point
-                t_event, u_event = self._interpolate_event(t_old, u_old, self.t, self.u, g_old, g_new)
-                g_event = self.problem.event_value(t_event, u_event)
+                t_event, u_event = self._interpolate_event(t_old, u_old, self.state.t, self.state.u, g_old, g_new)
+                g_event = self.event(t_event, u_event)
 
                 if abs(g_event) > self.event_tol:
                     raise RuntimeError("Event not localized within the specified tolerance.")
 
-                self.t = t_event
-                self.u = u_event
-                if self.history is not None:
-                    self.history["t"][-1] = self.t
-                    self.history["u"][-1] = np.copy(self.u)
-                
-                return self.t, self.u
+                self.state.t = t_event
+                self.state.u = u_event
+
+                if self.save_history:
+                    self.history["t"][-1] = self.state.t
+                    self.history["u"][-1] = copy.deepcopy(self.state.u)
+
+                return self.state
 
             g_old = g_new
-     
-     
-class TimeStepperPropagator(Propagator):
-    """
-    Propagator based on an event-driven TimeStepper.
-    """
-
-    def __init__(self, timestepper, direction=0):
-        self.timestepper = timestepper
-        self.direction = direction
-
-    @property
-    def history(self):
-        return self.timestepper.history
-
-    def propagate(self, t, u):
-        self.timestepper.t = t
-        self.timestepper.u = u
-        if self.timestepper.history is not None:
-            self.timestepper.reset_history()
-        return self.timestepper.advance_to_event(direction=self.direction)
