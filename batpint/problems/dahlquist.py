@@ -9,11 +9,33 @@ class Dahlquist(Problem):
     """
     
     def __init__(self, t_start, u_start, lam, alpha, event=None, terminate_step=None):
-                
+        """
+        Parameters
+        ----------
+        t_start : float
+            Initial time.
+        u_start : float
+            Initial value of the solution.
+        lam : callable  
+          Function that returns the value of λ for a given cycle.
+        alpha : float
+            The frequency of the forcing term.
+        event : callable, optional
+            Event function.
+        terminate_step : callable, optional
+            Function to determine if the integration should terminate at a given step.
+        """
+
         def rhs(t, u, cycle, lam, alpha):
+            """
+            Right-hand side of the Dahlquist problem.
+            """
             return lam(cycle)*u + np.sin(alpha * t)
         
         def jacobian(t, u, cycle, lam):
+            """
+            Jacobian of the Dahlquist problem.
+            """
             return lam(cycle)
 
         super().__init__(
@@ -54,19 +76,6 @@ class DahlquistExact(IntegrationMethod):
         t_next = t + h
 
         denominator = alpha**2 + lam_cycle**2
+        C = np.exp(-lam_cycle * t) * (u + (alpha * np.cos(alpha * t) + lam_cycle * np.sin(alpha * t)) / denominator)
 
-        C = np.exp(-lam_cycle * t) * (
-            u
-            + (
-                alpha * np.cos(alpha * t)
-                + lam_cycle * np.sin(alpha * t)
-            ) / denominator
-        )
-
-        return (
-            C * np.exp(lam_cycle * t_next)
-            - (
-                alpha * np.cos(alpha * t_next)
-                + lam_cycle * np.sin(alpha * t_next)
-            ) / denominator
-        )
+        return (C * np.exp(lam_cycle * t_next) - (alpha * np.cos(alpha * t_next) + lam_cycle * np.sin(alpha * t_next)) / denominator)
