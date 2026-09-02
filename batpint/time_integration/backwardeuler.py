@@ -8,8 +8,9 @@ class BackwardEuler(IntegrationMethod):
 
     def __init__(self, algebraic_solver):
         self.algebraic_solver = algebraic_solver
+        super().__init__()
 
-    def step(self, rhs, t, u, h, jacobian=None):
+    def step(self, t, u, h, rhs, jacobian=None):
         """
         Perform a single Backward Euler step.
         
@@ -24,9 +25,6 @@ class BackwardEuler(IntegrationMethod):
             Time step size.
         jacobian : callable, optional
             Jacobian J_f(t, u, ...) of the right-hand side.
-        **kwargs
-            Additional dynamic problem data forwarded to the right-hand
-            side and Jacobian evaluations.
 
         Returns:
         -------
@@ -47,4 +45,8 @@ class BackwardEuler(IntegrationMethod):
                 return np.eye(Jf.shape[0]) - h * Jf      
 
         # Use the algebraic solver to solve for u_new
-        return self.algebraic_solver.solve(residual, x0=np.copy(u),residual_jacobian=residual_jacobian)
+        return self.algebraic_solver.solve(
+            residual,
+            x0=np.copy(u),
+            residual_jacobian=residual_jacobian
+            )
