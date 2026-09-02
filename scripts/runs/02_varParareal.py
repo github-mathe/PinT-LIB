@@ -2,10 +2,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-from batpint.timestepping import timestepper
-from batpint.timestepping.timestepper import TimeStepper, TimeStepperPropagator, PropagationState
-from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact
+from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact, solve_dahlquist_cycles
 from batpint.parareal.parareal import PararealModified
+from batpint.parareal.propagation_state import PropagationState
+from batpint.timestepping.timestepper import TimeStepper
+from batpint.parareal.timestepper_propagator import TimeStepperPropagator
 
 # Dahlquist test problem parameters
 t_start = 0
@@ -28,62 +29,17 @@ def terminate(state):
 
 # Create Dahlquist problem and Backward Euler method
 problem = Dahlquist(t_start=t_start, u_start=u_start, lam=lam, alpha=alpha, event=event)
-
 methodNum = DahlquistBE()
 methodEx = DahlquistExact()
 
+# define a function to create a PropagationState with the event value
 make_state = lambda t, u, cycle: PropagationState(t=t, u=u, cycle=cycle, u_event=u)
 
-# solve the problem
-def solve_dahlquist(dt, num_events, method, save_history=True):
-    """
-    solve_dahlquist solves the Dahlquist problem using the specified time stepper method.
-    Args:
-        dt (float): time step size
-        num_events (int): number of events to simulate
-        method (TimeStepper): time stepping method to use
-        save_history (bool, optional): whether to save the history of the time stepping. Defaults to True.
-
-    Returns:
-        tuple: (t_all, u_all, t_ev, u_ev) where t_all and u_all are the time and solution arrays for the entire simulation, 
-        and t_ev and u_ev are the time and solution arrays at the event points.
-    """
-    
-    t_ev = np.zeros(num_events+1)
-    t_ev[0] = problem.t_start
-    u_ev = np.zeros(num_events+1, dtype=complex)
-    u_ev[0] = problem.u_start
-    states = []
-    t_all = [problem.t_start]
-    u_all = [problem.u_start]
-
-    timestepper = TimeStepper(problem=problem, method=method, dt=dt, save_history=save_history)
-    propagator = TimeStepperPropagator(timestepper=timestepper, direction=1, terminate_cycle = terminate)
-    
-    for ev in range(num_events):
-        
-        current_state = make_state(t_ev[ev], u_ev[ev], ev)
-        states.append(current_state)
-        t_new, u_new = propagator.propagate(state=current_state)
-
-        t_ev[ev+1] = t_new
-        u_ev[ev+1] = u_new
-        
-        # extract solution for the current cycle
-        t_local = np.asarray(propagator.history['t'])
-        u_local = np.asarray(propagator.history['u'])
-        
-        # save the solution for the current cycle
-        t_all.extend(t_local[1:])
-        u_all.extend(u_local[1:])
-        
-    return np.asarray(t_all), np.asarray(u_all), np.asarray(t_ev), np.asarray(u_ev)
-
 # %%
-num_events = 5 # number of cycles
+num_cycles = 5 # number of cycles
 try:    
-    tNum, uNum, t_evNum, u_evNum = solve_dahlquist(dt=dtNum, num_events=num_events, method=methodNum, save_history=True)
-    tEx, uEx, t_evEx, u_evEx = solve_dahlquist(dt=dtEx, num_events=num_events, method=methodEx, save_history=True)
+    tNum, uNum, t_evNum, u_evNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtNum, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+    tEx, uEx, t_evEx, u_evEx = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dtEx, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
     # Plotting the results
     plt.plot(uNum.real, uNum.imag, label="Numerical")
     plt.plot(uEx.real, uEx.imag, "--", label="Analytical")
@@ -93,7 +49,6 @@ except Exception as e:
     print(f"An error occurred during the simulation: {e}")
 
 # %%
-
 # error analysis
 dtVals =  1./(10**np.arange(1,6))
 error_t_ev = np.zeros_like(dtVals)
@@ -101,8 +56,8 @@ error_u_ev = np.zeros_like(dtVals)
 
 for i,dt in enumerate(dtVals):
     try:
-        tNum, uNum, t_evNum, u_evNum = solve_dahlquist(dt=dt, num_events=num_events, method=methodNum, save_history=True)
-        tEx, uEx, t_evEx, u_evEx = solve_dahlquist(dt=dt, num_events=num_events, method=methodEx, save_history=True)
+        tNum, uNum, t_evNum, u_evNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+        tEx, uEx, t_evEx, u_evEx = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
     except Exception as e:
         print(f"An error occurred during the simulation: {e}")
         continue
@@ -113,7 +68,6 @@ for i,dt in enumerate(dtVals):
 # %%
 # Plotting the error
 plt.figure()
-
 plt.loglog(
     dtVals,
     error_t_ev,
@@ -121,7 +75,6 @@ plt.loglog(
     label=r"$\|t_{\mathrm{ev}}^{\mathrm{ex}}"
           r"-t_{\mathrm{ev}}^{\mathrm{num}}\|_\infty$",
 )
-
 plt.loglog(
     dtVals,
     error_u_ev,
@@ -129,20 +82,16 @@ plt.loglog(
     label=r"$\|u_{\mathrm{ev}}^{\mathrm{ex}}"
           r"-u_{\mathrm{ev}}^{\mathrm{num}}\|_\infty$",
 )
-
 plt.xlabel(r"$\Delta t$")
 plt.ylabel(r"$L_\infty$ error")
-
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
 plt.show()
 
 # %%
-
 # Adaptive Parareal
-
-N = num_events # time windows - coarse time grid
+N = num_cycles # time windows - coarse time grid
 K = N+1 # Parareal iterations
 dtF = 1/10000 # Fine solver's time steps
 dtG = 1/100  # Coarse solver's time steps
@@ -155,23 +104,29 @@ propagatorG = TimeStepperPropagator(timestepper=timestepperG, direction=1, termi
 
 parareal = PararealModified(fine=propagatorF, coarse=propagatorG, make_state=make_state)
 time_start = time.time()
+
 try:
     TT, U = parareal.solve(t0=t_start, u0=u_start, K=K, N=N)
 except Exception as e:
     print(f"Parareal execution failed: {e}")
+
 time_end = time.time()
 total_time_parareal = time_end - time_start
+
 print(f"Parareal execution ended in {total_time_parareal:.2f} seconds")
 
 # %%
 # solve with fine solver for comparison
 time_start = time.time()
+
 try:
-    tFine, uFine, t_evFine, u_evFine = solve_dahlquist(dt=dtF, num_events=num_events, method=methodNum, save_history=True)
+    tFine, uFine, t_evFine, u_evFine = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtF, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
 except Exception as e:
     print(f"An error occurred during the fine solver simulation: {e}")
+
 time_end = time.time()
 total_time_fine = time_end - time_start
+
 print(f"Fine solver computation completed in {total_time_fine:.2f} seconds")
 
 # %%
@@ -231,3 +186,4 @@ plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
 plt.tight_layout()
+# %%
