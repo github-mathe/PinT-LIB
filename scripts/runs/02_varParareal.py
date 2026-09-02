@@ -11,7 +11,7 @@ from batpint.parareal.timestepper_propagator import TimeStepperPropagator
 # Dahlquist test problem parameters
 t_start = 0
 u_start = 1+0j
-ev_Start = 1
+ev_Start = 0 # event start cycle
 dtNum = 0.001
 dtEx = 0.0001
 
@@ -36,51 +36,61 @@ methodEx = DahlquistExact()
 make_state = lambda t, u, cycle: PropagationState(t=t, u=u, cycle=cycle, u_event=u)
 
 # %%
-num_cycles = 5 # number of cycles
+# Solve the Dahlquist problem for a number of cycles and plot the results
+# teNum and ueNum are the event times and values for the numerical solution
+# teTh and ueTh are the event times and values for the analytical solution
+
+num_cycles = 4 # number of cycles
 try:    
-    tNum, uNum, t_evNum, u_evNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtNum, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
-    tEx, uEx, t_evEx, u_evEx = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dtEx, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+    tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtNum, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+    tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dtEx, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+
     # Plotting the results
     plt.plot(uNum.real, uNum.imag, label="Numerical")
-    plt.plot(uEx.real, uEx.imag, "--", label="Analytical")
-    plt.plot(u_evNum.real, u_evNum.imag, 'o', label=r"$u_{\mathrm{ev}}$ (Numerical)")
+    plt.plot(uTh.real, uTh.imag, "--", label="Analytical")
+    plt.plot(ueNum.real, ueNum.imag, 'o', label=r"$u_{\mathrm{ev}}$ (Numerical)")
     plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid();
 except Exception as e:
     print(f"An error occurred during the simulation: {e}")
 
 # %%
-# error analysis
+# error analysis for the Dahlquist problem
 dtVals =  1./(10**np.arange(1,6))
-error_t_ev = np.zeros_like(dtVals)
-error_u_ev = np.zeros_like(dtVals)
+err_te = np.zeros_like(dtVals) # error in event times
+err_ue = np.zeros_like(dtVals) # error in event values
 
+print(f"{'dt':>5} | {'te':>12} | {'ue':>18}")
 for i,dt in enumerate(dtVals):
     try:
-        tNum, uNum, t_evNum, u_evNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
-        tEx, uEx, t_evEx, u_evEx = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+        tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+        tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
     except Exception as e:
         print(f"An error occurred during the simulation: {e}")
         continue
-    error_t_ev[i] = np.max(np.abs(t_evNum - t_evEx))
-    error_u_ev[i] = np.max(np.abs(u_evNum - u_evEx))
-    print(f"dt = {dt}, error_t_ev = {error_t_ev[i]}, error_u_ev = {error_u_ev[i]}")
+    err_te[i] = np.max(np.abs(teNum - teTh))
+    err_ue[i] = np.max(np.abs(ueNum - ueTh))
+    print(
+        f"{dt:12.1e} "
+        f"{err_te[i]:18.6e} "
+        f"{err_ue[i]:18.6e}"
+    )
 
 # %%
 # Plotting the error
 plt.figure()
 plt.loglog(
     dtVals,
-    error_t_ev,
+    err_te,
     "--o",
-    label=r"$\|t_{\mathrm{ev}}^{\mathrm{ex}}"
-          r"-t_{\mathrm{ev}}^{\mathrm{num}}\|_\infty$",
+    label=r"$\|t_{\mathrm{e}}^{\mathrm{ex}}"
+          r"-t_{\mathrm{e}}^{\mathrm{num}}\|_\infty$",
 )
 plt.loglog(
     dtVals,
-    error_u_ev,
+    err_ue,
     "-*",
-    label=r"$\|u_{\mathrm{ev}}^{\mathrm{ex}}"
-          r"-u_{\mathrm{ev}}^{\mathrm{num}}\|_\infty$",
+    label=r"$\|u_{\mathrm{e}}^{\mathrm{ex}}"
+          r"-u_{\mathrm{e}}^{\mathrm{num}}\|_\infty$",
 )
 plt.xlabel(r"$\Delta t$")
 plt.ylabel(r"$L_\infty$ error")
@@ -91,6 +101,7 @@ plt.show()
 
 # %%
 # Adaptive Parareal
+# Set up Parareal parameters
 N = num_cycles # time windows - coarse time grid
 K = N+1 # Parareal iterations
 dtF = 1/10000 # Fine solver's time steps
@@ -101,7 +112,7 @@ timestepperG = TimeStepper(problem=problem, method=methodNum, dt=dtG, save_histo
 propagatorF = TimeStepperPropagator(timestepper=timestepperF, direction=1, terminate_cycle = terminate)
 propagatorG = TimeStepperPropagator(timestepper=timestepperG, direction=1, terminate_cycle = terminate)
 
-
+# solve the Dahlquist problem using Parareal
 parareal = PararealModified(fine=propagatorF, coarse=propagatorG, make_state=make_state)
 time_start = time.time()
 
@@ -116,11 +127,11 @@ total_time_parareal = time_end - time_start
 print(f"Parareal execution ended in {total_time_parareal:.2f} seconds")
 
 # %%
-# solve with fine solver for comparison
+# solve with fine solver
 time_start = time.time()
 
 try:
-    tFine, uFine, t_evFine, u_evFine = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtF, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+    tFine, uFine, teFine, ueFine = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtF, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
 except Exception as e:
     print(f"An error occurred during the fine solver simulation: {e}")
 
@@ -134,32 +145,32 @@ print(f"Fine solver computation completed in {total_time_fine:.2f} seconds")
 dtF_index = np.where(dtVals == dtF)[0][0]
 
 # error at the event points for the fine solver
-err_t_ev_fine = error_t_ev[dtF_index]
-err_u_ev_fine = error_u_ev[dtF_index]
+err_teFine = err_te[dtF_index] # error in event times for the fine solver
+err_ueFine = err_ue[dtF_index] # error in event values for the fine solver
 
 # error at the event points for the Parareal solver
-err_t_ev_per_cycle = np.zeros((K+1, N+1), dtype=float)
-err_u_ev_per_cycle = np.zeros((K+1, N+1), dtype=complex)
+err_teParareal = np.zeros((K+1, N+1), dtype=float) # error in event times per cycle
+err_ueParareal = np.zeros((K+1, N+1), dtype=complex) # error in event values per cycle
 for k in range(K+1):
-    err_t_ev_per_cycle[k, :] = np.abs(TT[k, :] - t_evFine)
-    err_u_ev_per_cycle[k, :] = np.abs(np.asarray(list(U[k, :]),dtype=complex) - u_evFine)
-err_t_ev_parareal = np.max(err_t_ev_per_cycle, axis=1)
-err_u_ev_parareal = np.max(err_u_ev_per_cycle, axis=1)
+    err_teParareal[k, :] = np.abs(TT[k, :] - teFine)
+    err_ueParareal[k, :] = np.abs(np.asarray(list(U[k, :]),dtype=complex) - ueFine)
+err_tePararealmax = np.max(err_teParareal, axis=1) # error in event times for the Parareal solver
+err_uePararealmax = np.max(err_ueParareal, axis=1) # error in event values for the Parareal solver
 
 # %%
 fig = plt.figure(figsize=(12, 8))
-fig.suptitle(f"Adaptive Parareal Error for N={N+1}")
+fig.suptitle(f"Adaptive Parareal Error for {N+1} cycles")
 plt.subplot(1,2, 1)
-plt.semilogy(range(K+1), err_t_ev_parareal, label=r'$\|tp_{Parareal} - tp_{FineNum}\|_\infty$')
-plt.axhline(y=err_t_ev_fine, color='red', linestyle='--', label="Fine solver error")
+plt.semilogy(range(K+1), err_tePararealmax, label=r'$\|te_{Parareal} - te_{FineNum}\|_\infty$')
+plt.axhline(y=err_teFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(K+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
 plt.legend()
 
 plt.subplot(1,2, 2)
-plt.semilogy(range(K+1), err_u_ev_parareal, label=r'$\|up_{Parareal} - up_{FineNum}\|_\infty$')
-plt.axhline(y=err_u_ev_fine, color='red', linestyle='--', label="Fine solver error")
+plt.semilogy(range(K+1), err_uePararealmax, label=r'$\|ue_{Parareal} - ue_{FineNum}\|_\infty$')
+plt.axhline(y=err_ueFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(K+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
@@ -168,22 +179,23 @@ plt.tight_layout()
 
 # plotting the error vs N points
 fig = plt.figure(figsize=(12, 8))
-fig.suptitle(f"Adaptive Parareal Error for N={N+1}")
+fig.suptitle(f"Adaptive Parareal Error for {N+1} cycles")
 plt.subplot(1,2, 1)
 for k in range(K+1):
-    plt.semilogy(range(N+1), err_t_ev_per_cycle[k,:], label=f"k={k}")
-plt.axhline(y=err_t_ev_fine, color='red', linestyle='--', label="Fine solver error")
+    plt.semilogy(range(N+1), err_teParareal[k,:], label=f"k={k}")
+plt.axhline(y=err_teFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
-plt.legend()
+plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
 
 plt.subplot(1,2, 2)
 for k in range(K+1):
-    plt.semilogy(range(N+1), err_u_ev_per_cycle[k,:], label=f"k={k}")
-plt.axhline(y=err_u_ev_fine, color='red', linestyle='--', label="Fine solver error")
+    plt.semilogy(range(N+1), err_ueParareal[k,:], label=f"k={k}")
+plt.axhline(y=err_ueFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Time window n"), plt.ylabel("Error"), plt.grid();
+plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
 plt.tight_layout()
 plt.show()
+
+# %%
