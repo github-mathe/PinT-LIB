@@ -11,7 +11,7 @@ class PararealModified:
         Fine propagator F.
     coarse : Propagator
         Coarse propagator G.
-    make state : callable
+    make_state : callable
         Function
             make_state(t, u, n)
         returning the propagation state for cycle n.
@@ -32,7 +32,10 @@ class PararealModified:
             Number of Parareal iterations.
         N : int
             Number of time windows (coarse time grid).
-
+        t0 : float
+            Initial time.
+        u0 : object
+            Initial condition.
         Returns
         -------
         TT : np.ndarray
