@@ -85,9 +85,7 @@ class TimeStepper:
             self.history["t"].append(self.state.t)
             self.history["u"].append(copy.deepcopy(self.state.u))
 
-        self.state.terminated_step = self.terminate_step(self.state.t, self.state.u)
-
-        if self.state.terminated_step:
+        if self.terminate_step(self.state.t, self.state.u):
             raise RuntimeError(
                 f"STEP_TERMINATION: cycle={self.state.cycle}, "
                 f"t={self.state.t}, u={self.state.u}"

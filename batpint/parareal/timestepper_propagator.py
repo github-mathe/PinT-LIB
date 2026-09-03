@@ -18,7 +18,6 @@ class TimeStepperPropagator(Propagator):
     def propagate(self, state):
         self.timestepper.set_state(state)
         if self.terminate_cycle(self.timestepper.state):
-            self.timestepper.state.terminated_cycle = True
             raise RuntimeError(
             f"CYCLE_TERMINATION: cycle={self.timestepper.state.cycle}, "
             f"t={self.timestepper.state.t}, "

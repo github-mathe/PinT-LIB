@@ -19,8 +19,5 @@ class PropagationState:
         self.t = t
         self.u = copy.deepcopy(u)
         self.cycle = cycle
-
-        self.terminated_step = False
-        self.terminated_cycle = False
         for key, value in kwargs.items():
             setattr(self, key, value)
