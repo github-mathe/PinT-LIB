@@ -18,10 +18,9 @@ model = pybamm.lithium_ion.DFN(*args)
 
 # Space discretization
 var_pts = {
-    "x_n": 3,   # points in the negative electrode
+    "x_n": 1,   # points in the negative electrode
     "x_s": 30,  # points in the separator
     "x_p": 30,  # points in the positive electrode
-    "r_n": 3,   # points in the radius of negative electrode
     "r_p": 100  # points in the radius of positive electrode
 }
 
@@ -37,18 +36,14 @@ sim = pybamm.Simulation(
     parameter_values=parameter_values,
     solver=solver,
     var_pts=var_pts)
-sol1 = sim.solve()
-state1 = sol1.last_state.y
-print(len(sol1.cycles))
+sim.build_for_experiment()
 
-# second cycle 
-new_model = model.set_initial_conditions_from(sol1,inplace=False)
-sim_new = pybamm.Simulation(
-    new_model,
-        experiment=experiment,
-    parameter_values=parameter_values,
-    solver=solver,
-    var_pts=var_pts)
+sol1=sim.solve()
 
-sol2 =sim_new.solve()
-print(len(sol2.cycles))
+print("Terminated at t = ", sol1.t[-1], "s with status", sol1.termination)
+
+last_state = sol1.cycles[-1].last_state
+
+sol2=sim.solve(starting_solution=last_state)
+
+print("Terminated at t = ", sol2.t[-1], "s with status", sol2.termination)
