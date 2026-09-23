@@ -1,7 +1,7 @@
 import pybamm
 
 
-def batteryProblem(nCycles=10, expType="GITT"):
+def batteryExperiment(nCycles=10, expType="GITT"):
     if expType == "GITT":
         # define GITT experiment: short pulse followed by long rest period
         pulse_duration = "10 minutes"  # duration of current pulse
@@ -41,3 +41,5 @@ def batteryProblem(nCycles=10, expType="GITT"):
         raise NotImplementedError(f"{expType}")
 
     return experiment
+    
+    

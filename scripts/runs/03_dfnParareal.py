@@ -4,13 +4,14 @@ from time import time
 from pprint import pp as pprint
 from batpint import plt
 import batpint.parameter.javid as bpar
-from batpint.problems.battery import batteryProblem
+from batpint.problems.battery import batteryExperiment
+from batpint.parareal.pybamm_propagator import PybammPropagator
 
 # Script parameters
 half_cell = True
 exp = "CCCV" # GITT or CCCV
 nCycles = 1
-showTimeSteps = True
+num_cycles = 10
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
@@ -28,58 +29,97 @@ var_pts = {
 parameter_values=pybamm.ParameterValues(
     bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
 
-experiment = batteryProblem(nCycles, expType=exp)
+# construct the simulation for the stepwise solving from (cycle to cycle)
+experiment = batteryExperiment(nCycles, expType=exp)
 solver = pybamm.IDAKLUSolver()
-sim = pybamm.Simulation(
-    model,
-    experiment=experiment,
-    parameter_values=parameter_values,
-    solver=solver,
-    var_pts=var_pts,)
 
-sim.build_for_experiment()
+propagator = PybammPropagator(model, experiment, parameter_values, var_pts)
 
-# stepwise implementation
+
+#%%
+# solve
 solutions = {}
-num_cycles = 10
+start_sol = None
 for cycle in range(num_cycles):
-    if cycle==0:
-        sol = sim.solve()
-    else:
-        sol = sim.solve(starting_solution=solutions[cycle-1].cycles[-1].last_state)
-    solutions[cycle] = sol
-    print("Started at t = ", solutions[cycle].t[0])
-    print("Terminated at t = ", solutions[cycle].t[-1], "s with status", solutions[cycle].termination)
+    solution, final_state = propagator.propagate(starting_state=start_sol)
+    solutions[cycle] = solution
+    if cycle>0:
+        y0_new_state = start_sol.y
+        y0_actual = solution.first_state.y
+        err_y0 = np.max(np.abs(y0_new_state-y0_actual))
+        print("Change in initialization: ", err_y0)
+    start_sol = final_state
 
-# full implementation
-experiment_all = batteryProblem(num_cycles, expType=exp)
-sim_all = pybamm.Simulation(
-    model,
-    experiment=experiment_all,
+
+#%%
+# construct the simulation for the sequential solving for all cycles in one solve
+experiment_seq = batteryExperiment(num_cycles, expType=exp)
+model_seq = pybamm.lithium_ion.DFN(*args)
+sim_seq = pybamm.Simulation(
+    model_seq,
+    experiment=experiment_seq,
     parameter_values=parameter_values,
     solver=solver,
     var_pts=var_pts,)
-sim_all.build_for_experiment()
-sol_all = sim_all.solve()
+sol_seq = sim_seq.solve()
 
 #%%
-for i, sol in enumerate(sol_all.cycles):
-    print("Started at t = ", sol.t[0])
-    print("Terminated at t = ", sol.t[-1], "s with status", sol.termination)
-
-#%%
+# Check if the computed solutions are identical
+last_states = {}
 for cycle in range(num_cycles):
     sol_step = solutions[cycle]
-    sol = sol_all.cycles[cycle]
-    print("Cycle: ", cycle,"tStart_diff: ", sol_step.t[0]-sol.t[0],"tEnd_diff", sol_step.t[-1] - sol.t[-1])
-    t = np.linspace(sol.t[0], sol.t[-1],1000)
+    
+    last_states[cycle] = sol_step.last_state
+    sol = sol_seq.cycles[cycle]
+    print(f"Cycle: {cycle}","tStart_diff: ", sol_step.t[0]-sol.t[0],"tEnd_diff", sol_step.t[-1] - sol.t[-1])
+    t_min = np.maximum(sol_step.t[0], sol.t[0])
+    t_max = np.minimum(sol_step.t[-1], sol.t[-1])
+    t = np.linspace(t_min, t_max,1000)
     
     err_V = np.max(np.abs(sol_step["Voltage [V]"](t) - sol["Voltage [V]"](t)))
-    print("Error in voltage values: ", err_V)
+    print(f"Cycle {cycle}: Error in voltage values: ", err_V)
     
     y_step = np.asarray(sol_step.last_state.y).reshape(-1)
     y_seq = np.asarray(sol.last_state.y).reshape(-1)
 
     err_y = np.max(np.abs(y_step - y_seq))
+    print(f"Cycle {cycle}: state error = {err_y}")
+    
+    
 
-    print(f"Cycle {i}: state error = {err_y}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
