@@ -91,13 +91,14 @@ for eq_type, equations in [
 
     print()
 
+t_switch = {}
 for cycle_index in range(len(solution_all.cycles) - 1):
     cycle_old = solution_all.cycles[cycle_index]
     cycle_new = solution_all.cycles[cycle_index + 1]
     
     if cycle_old is None or cycle_new is None:
         continue
-
+    t_switch[cycle_index] = [cycle_old.t[-1], len(cycle_old.t) - 1]
     y_old = np.asarray(
         cycle_old.last_state.y[:, -1]
     ).reshape(-1)
@@ -147,8 +148,9 @@ for cycle_index in range(len(solution_all.cycles) - 1):
     
 #%%
 # state variables of the model
+I_app = solution_all["Throughput capacity [A.h]"]
 c_s_p = solution_all["Positive particle concentration [mol.m-3]"]
-eps_c_e = solution_all["Porosity times concentration [mol.m-3]"]    
+eps_ce = solution_all["Porosity times concentration [mol.m-3]"]    
 ce = solution_all["Electrolyte concentration [mol.m-3]"]
 phi_s_p = solution_all["Positive electrode potential [V]"]
 phi_e = solution_all["Electrolyte potential [V]"]
@@ -160,13 +162,71 @@ x_s = solution_all["x_s [m]"].entries[:,-1]
 x_p = solution_all["x_p [m]"].entries[:,0]
 t = solution_all["Time [s]"].entries
 
-k_t = 1000
-k_x = 20
+idx = t_switch[0][1]
 
-c_particle = c_s_p.entries[:, k_x, k_t]
+# plot switch times in the states
+# concentration in the particle
+plt.figure()
+plt.plot(r_p*1e6, c_s_p.entries[:,-1,idx], label=f"Time {t[idx]:.16e}")
+plt.plot(r_p*1e6, c_s_p.entries[:,-1,idx+1],label=f"Time {t[idx+1]:.16e}")
+plt.xlabel(r"$r$ [m]")
+plt.ylabel(r"$c_s$ [mol m$^{-3}$]")
+plt.title("Concentration particle")
+plt.grid()
+plt.legend()
+plt.show()
+#potential in the positive electrode
+plt.figure()
+plt.plot(x_p*1e6, phi_s_p.entries[:,t_switch[0][1]],label=f"Time {t_switch[0][0]}")
+plt.plot(x_p*1e6, phi_s_p.entries[:,t_switch[0][1]+1],label=f"Time {t[t_switch[0][1]+1]}")
+plt.xlabel(r"$x_p$ [m]")
+plt.ylabel(r"$\phi_s$ [mol m$^{-3}$]")
+plt.title("Potential in the electrode")
+plt.legend()
+plt.grid()
+plt.show()
+# concentration in the electrolyte 
+x_eps_ce = eps_ce.mesh.nodes
+x_ce = ce.mesh.nodes
+# concentration in the electrolyte
 
-plt.plot(r_p, c_particle)
-plt.xlabel(r"$r_p$ [m]")
-plt.ylabel(r"$c_{s,p}$ [mol m$^{-3}$]")
 
+plt.figure()
+
+plt.plot(x_eps_ce*1e6, eps_ce.entries[:, idx], label=f"Time {t[idx]:.16e}",)
+plt.plot(x_eps_ce*1e6, eps_ce.entries[:, idx + 1], label=f"Time {t[idx + 1]:.16e}",)
+plt.xlabel(r"$x$ [m]")
+plt.ylabel(r"$\epsilon_e c_e$ [mol m$^{-3}$]")
+plt.title("Porosity times concentration")
+plt.legend()
+plt.grid()
+plt.show()
+
+plt.figure()
+
+plt.plot(x_ce*1e6, ce.entries[:, idx], label=f"Time {t[idx]:.16e}",)
+plt.plot(x_ce*1e6, ce.entries[:, idx + 1], label=f"Time {t[idx + 1]:.16e}",)
+plt.xlabel(r"$x$ [m]")
+plt.ylabel(r"$c_e$ [mol m$^{-3}$]")
+plt.title("Elcetrolyte concentration")
+plt.legend()
+plt.grid()
+
+plt.show()
+# potential in electrolyte
+plt.figure()
+plt.plot(x_ce*1e6, phi_e.entries[:, idx], label=f"Time {t[idx]:.16e}",)
+plt.plot(x_ce*1e6, phi_e.entries[:, idx + 1], label=f"Time {t[idx + 1]:.16e}",)
+plt.xlabel(r"$x$ [m]")
+plt.ylabel(r"$c_e$ [mol m$^{-3}$]")
+plt.title("Elcetrolyte potential")
+plt.legend()
+plt.grid()
+plt.show()
+# capacity
+plt.figure()
+plt.plot(t[:idx+1], I_app.entries[:idx+1],label=f"Time {t[idx]:.16e}")
+plt.plot(t[idx+1:], I_app.entries[idx+1:],label=f"Time {t[idx + 1]:.16e}")
+plt.legend()
+plt.show()
 
