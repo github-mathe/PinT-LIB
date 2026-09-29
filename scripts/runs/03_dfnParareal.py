@@ -5,7 +5,9 @@ import batpint.parameter.javid as bpar
 from batpint.problems.battery import batteryExperiment
 from batpint.parareal.pybamm_propagator import PybammPropagator
 from batpint.parareal.parareal import PararealModified
-
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 
 # Script parameters
 half_cell = True
@@ -15,14 +17,14 @@ num_cycles = 2
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
-model = pybamm.lithium_ion.DFN(*args)
-
+model_step = pybamm.lithium_ion.DFN(*args)
+model_all = pybamm.lithium_ion.DFN(*args)
 # Space discretization
 var_pts = {
     "x_n": 1,   # points in the negative electrode
     "x_s": 30,  # points in the separator
     "x_p": 30,  # points in the positive electrode
-    "r_p": 100  # points in the radius of positive electrode
+    "r_p": 30  # points in the radius of positive electrode
 }
 
 # Setup experiment
@@ -30,118 +32,141 @@ parameter_values=pybamm.ParameterValues(
     bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
 
 # construct the simulation for the stepwise solving from (cycle to cycle)
-experiment = batteryExperiment(nCycles, expType=exp)
+experiment_step = batteryExperiment(nCycles, expType=exp)
+experiment_all = batteryExperiment(num_cycles,expType=exp)
 solver = pybamm.IDAKLUSolver()
-sim_step = pybamm.Simulation(
-    model,
-    experiment=experiment,
-    parameter_values=parameter_values,
-    solver=solver,
-    var_pts=var_pts,
-    experiment_model_mode="unified")
-#propagator = PybammPropagator(model, experiment, parameter_values, var_pts)
+sim_all = pybamm.Simulation(model_all, 
+                            experiment=experiment_all,
+                            parameter_values=parameter_values,
+                            var_pts=var_pts,
+                            solver=solver)
 
+sim_step = pybamm.Simulation(model_step, 
+                            experiment=experiment_step,
+                            parameter_values=parameter_values,
+                            var_pts=var_pts,
+                            solver=solver)
 
-#%%
-# solve
-# check the starting states 
-solutions = {}
-start_sol = None
-for cycle in range(num_cycles):
-    solution = sim_step.solve(starting_solution=start_sol)
-    #t,u,solution = propagator.propagate_with_solution(starting_state=start_sol)
-    solutions[cycle] = solution.cycles[-1]
-    if cycle>0:
-        y0_new_state = start_sol.y
-        y0_actual = solution.first_state.y
-        err_y0 = np.max(np.abs(y0_new_state-y0_actual))
-        print("Change in initialization: ", err_y0)
-    start_sol = solution.last_state
-    
-#%%
-# construct the simulation for the sequential solving for all cycles in one solve
-experiment_seq = batteryExperiment(num_cycles, expType=exp)
-model_seq = pybamm.lithium_ion.DFN(*args)
-solver_seq = pybamm.IDAKLUSolver() 
-sim_seq = pybamm.Simulation(
-    model_seq,
-    experiment=experiment_seq,
-    parameter_values=parameter_values,
-    solver=solver_seq,
-    var_pts=var_pts,
-    experiment_model_mode="unified")
-sol_seq = sim_seq.solve()
-tEnd_cycle = [sol.last_state.t for sol in sol_seq.cycles]
-tStart_cycle = [sol.first_state.t for sol in sol_seq.cycles]
-
-uEnd_cycle = [np.asarray(sol.last_state.y).reshape(-1) for sol in sol_seq.cycles]
-uStart_cycle = [np.asarray(sol.first_state.y).reshape(-1) for sol in sol_seq.cycles]
-
+#solve for all cycles
+solution_all = sim_all.solve()
 
 #%%
-# Check if the computed solutions are identical
-last_states = {}
-for cycle in range(num_cycles):
-    sol_step = solutions[cycle]
-    
-    last_states[cycle] = sol_step.last_state
-    sol = sol_seq.cycles[cycle]
-    print(f"Cycle: {cycle}","tStart_diff: ", sol_step.t[0]-sol.t[0],\
-          "tEnd_diff", sol_step.t[-1] - sol.t[-1])
-    t_min = np.maximum(sol_step.t[0], sol.t[0])
-    t_max = np.minimum(sol_step.t[-1], sol.t[-1])
-    t = np.linspace(t_min, t_max,1000)
-    
-    err_V = np.max(np.abs(sol_step["Voltage [V]"](t) - sol["Voltage [V]"](t)))
-    print(f"Cycle {cycle}: Error in voltage values: ", err_V)
-    
-    y_step = np.asarray(sol_step.last_state.y).reshape(-1)
-    y_seq = np.asarray(sol.last_state.y).reshape(-1)
+print(f"Solved {num_cycles} cycles.")
+print(f"Number of stored cycles: {len(solution_all.cycles)}")
 
-    err_y = np.max(np.abs(y_step - y_seq))
-    print(f"Cycle {cycle}: state error = {err_y}")
+cycle0 = solution_all.cycles[0]
+
+built_model = cycle0.first_state.all_models[0]
+y = cycle0.first_state.y
+n_diff = built_model.concatenated_rhs.size
+n_alg = built_model.concatenated_algebraic.size
+
+print("\n" + "=" * 80)
+print("DAE STATE STRUCTURE")
+print("=" * 80)
+
+print(f"Differential states : {n_diff}")
+print(f"Algebraic states    : {n_alg}")
+print(f"Total states        : {n_diff + n_alg}")
+
+print(
+    "Solution y size   : "
+    f"{y.shape[0]}"
+)
+
+for eq_type, equations in [
+    ("DIFFERENTIAL", built_model.rhs),
+    ("ALGEBRAIC", built_model.algebraic),
+]:
+    print(eq_type)
+    for variable in equations:
+        slices = built_model.y_slices[variable]
+
+        for slc in slices:
+            print(
+                f"{variable.name:70s} "
+                f"[{slc.start}:{slc.stop}] "
+                f"size = {slc.stop - slc.start}"
+            )
+
+    print()
+
+for cycle_index in range(len(solution_all.cycles) - 1):
+    cycle_old = solution_all.cycles[cycle_index]
+    cycle_new = solution_all.cycles[cycle_index + 1]
+    
+    if cycle_old is None or cycle_new is None:
+        continue
+
+    y_old = np.asarray(
+        cycle_old.last_state.y[:, -1]
+    ).reshape(-1)
+
+    y_new = np.asarray(
+        cycle_new.first_state.y[:, -1]
+    ).reshape(-1)
+
+    y_old_diff = y_old[:n_diff]
+    y_new_diff = y_new[:n_diff]
+
+    y_old_alg = y_old[n_diff:]
+    y_new_alg = y_new[n_diff:]
+
+    diff_jump = y_new_diff - y_old_diff
+    alg_jump = y_new_alg - y_old_alg
+
+    print(
+        f"\nCycle {cycle_index + 1} -> "
+        f"Cycle {cycle_index + 2}"
+    )
+
+    print(
+        "  Time end old cycle:   "
+        f"{cycle_old.t[-1]:.16e}"
+    )
+
+    print(
+        "  Time start new cycle: "
+        f"{cycle_new.t[0]:.16e}"
+    )
+
+    print(
+        "  Time difference:      "
+        f"{cycle_new.t[0] - cycle_old.t[-1]:.16e}"
+    )
+
+    print(
+        "  Differential jump:    "
+        f"{np.max(np.abs(diff_jump)):.16e}"
+    )
+
+    print(
+        "  Algebraic jump:       "
+        f"{np.max(np.abs(alg_jump)):.16e}"
+    )
     
 #%%
+# state variables of the model
+c_s_p = solution_all["Positive particle concentration [mol.m-3]"]
+eps_c_e = solution_all["Porosity times concentration [mol.m-3]"]    
+ce = solution_all["Electrolyte concentration [mol.m-3]"]
+phi_s_p = solution_all["Positive electrode potential [V]"]
+phi_e = solution_all["Electrolyte potential [V]"]
 
-# Parareal
+r_p = solution_all["r_p [m]"].entries[:, 0, 0]
+x_n = solution_all["x_n [m]"].entries[0]
+x = solution_all["x [m]"].entries[:,-1]
+x_s = solution_all["x_s [m]"].entries[:,-1]
+x_p = solution_all["x_p [m]"].entries[:,0]
+t = solution_all["Time [s]"].entries
 
-N = num_cycles
-K = N*1
+k_t = 1000
+k_x = 20
 
-t_start = solutions[0].first_state.t
-u_start = np.asarray(solutions[0].first_state.y).reshape(-1).copy()
+c_particle = c_s_p.entries[:, k_x, k_t]
 
-propagatorF = PybammPropagator(model, experiment, parameter_values, var_pts,experiment_model_mode="unified")
-propagatorG = PybammPropagator(model, experiment, parameter_values, var_pts, experiment_model_mode="unified")
-
-
-make_state= lambda t,u,n: propagatorF.make_state(t,u)
-parareal = PararealModified(propagatorF, propagatorG, make_state=make_state)
-
-try:
-    TT, U = parareal.solve(t0=t_start, u0=u_start, K=K, N=N)
-except Exception as e:
-    print(f"Parareal execution failed: {e}")
-#%%
-err_TT = []
-err_U = []
-for k in range(1,K):
-    err_TT.append(np.abs(TT[k,1:]- tEnd_cycle))
-   # err_U.append(np.linalg.norm(U[k,1:]- uEnd_cycle))
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
+plt.plot(r_p, c_particle)
+plt.xlabel(r"$r_p$ [m]")
+plt.ylabel(r"$c_{s,p}$ [mol m$^{-3}$]")
 
 
