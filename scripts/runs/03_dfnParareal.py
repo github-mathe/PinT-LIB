@@ -13,7 +13,7 @@ from IPython.display import display, clear_output
 half_cell = True
 exp = "CCCV" # GITT or CCCV
 nCycles = 1
-num_cycles = 2
+num_cycles = 100
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
@@ -74,7 +74,7 @@ for cycle in range(num_cycles):
     print("cycle_sol changed:", cycle_sol.t[-1] != t_global[-1])
     
 print(f"Solved {num_cycles} cycles.")
-
+#%%
 # check the size of the states
 # processed models
 built_model_all = solution_all.cycles[0].first_state.all_models[0]
@@ -89,15 +89,15 @@ print("Same time lengths: ", len_t_all == len_t_step)
 
 #%%
 # interface times
-
-t_last_all = [sol.t[-1] for sol in solution_all.cycles]
 t_start_all = [sol.t[0] for sol in solution_all.cycles]
-t_switch_all = [t1-t2 for t1,t2 in zip(t_last_all[:-1],t_start_all[1:])]
+t_last_all = [sol.t[-1] for sol in solution_all.cycles]
+t_switch_all = [t1-t2 for t1,t2 in zip(t_start_all[1:],t_last_all[:-1])]
 
 t_last_step = [t[-1] for t in t_step]
 t_start_step = [t[0] for t in t_step]
-t_switch_step = [t1-t2 for t1,t2 in zip(t_last_step[:-1],t_start_step[1:])]
+t_switch_step = [t1-t2 for t1,t2 in zip(t_start_step[1:], t_last_step[:-1])]
 
+# difference in time at the time interface
 err_t_last = [t1-t2 for t1,t2 in zip(t_last_all,t_last_step)]
 err_t_start = [t1-t2 for t1,t2 in zip(t_start_all,t_start_step)]
 
@@ -106,30 +106,39 @@ err_t_start = [t1-t2 for t1,t2 in zip(t_start_all,t_start_step)]
 y_all = [sol.y for sol in solution_all.cycles]
 y_last_all = [sol.y[:,-1] for sol in solution_all.cycles]
 y_start_all = [sol.y[:,0] for sol in solution_all.cycles]
-y_switch_all = [y1-y2 for y1,y2 in zip(y_last_all[:-1],y_start_all[1:])]
+y_switch_all = [y1-y2 for y1,y2 in zip(y_last_all[:-1], y_start_all[1:])]
+err_y_switch_all = [np.linalg.norm(y_switch, ord=np.inf,axis = 0) for y_switch in y_switch_all]
 
 y_diff_last_all = [sol.y[:built_model_all.len_rhs,-1] for sol in solution_all.cycles]
 y_diff_start_all = [sol.y[:built_model_all.len_rhs,0] for sol in solution_all.cycles]
 y_diff_switch_all = [y1-y2 for y1,y2 in zip(y_diff_last_all[:-1],y_diff_start_all[1:])]
+err_y_diff_switch_all = [np.linalg.norm(y_switch, ord=np.inf,axis = 0) for y_switch in y_diff_switch_all]
 
 y_alg_last_all = [sol.y[built_model_all.len_rhs:,-1] for sol in solution_all.cycles]
 y_alg_start_all = [sol.y[built_model_all.len_rhs:,0] for sol in solution_all.cycles]
 y_alg_switch_all = [y1-y2 for y1,y2 in zip(y_alg_last_all[:-1],y_alg_start_all[1:])]
+err_y_alg_switch_all = [np.linalg.norm(y_switch, ord=np.inf,axis = 0) for y_switch in y_alg_switch_all]
 
 
 y_step = [sol.y for sol in solution_step]
 y_last_step = [sol.y[:,-1] for sol in solution_step]
 y_start_step = [sol.y[:,0] for sol in solution_step]
 y_switch_step = [y1-y2 for y1,y2 in zip(y_last_step[:-1],y_start_step[1:])]
+err_y_switch_step = [np.linalg.norm(y_switch, ord=np.inf,axis = 0) for y_switch in y_switch_step]
+
 
 y_diff_last_step = [sol.y[:built_model_step.len_rhs,-1] for sol in solution_step]
 y_diff_start_step = [sol.y[:built_model_step.len_rhs,0] for sol in solution_step]
 y_diff_switch_step = [y1-y2 for y1,y2 in zip(y_diff_last_step[:-1],y_diff_start_step[1:])]
+err_y_diff_switch_step = [np.linalg.norm(y_switch, ord=np.inf,axis = 0) for y_switch in y_diff_switch_step]
+
 
 y_alg_last_step =  [sol.y[built_model_step.len_rhs:,-1] for sol in solution_step]
 y_alg_start_step = [sol.y[built_model_step.len_rhs:,0] for sol in solution_step]
 y_alg_switch_step = [y1-y2 for y1,y2 in zip(y_alg_last_step[:-1],y_alg_start_step[1:])]
+err_y_alg_switch_step = [np.linalg.norm(y_switch, ord=np.inf,axis = 0) for y_switch in y_alg_switch_step]
 
+# L_Inf error of the state vectors at all times 
 err_y = [np.linalg.norm(y1-y2, ord=np.inf, axis = 0) for y1,y2 in zip(y_all,y_step)]
 err_y_diff = [np.linalg.norm(y1[:built_model_step.len_rhs,:]-y2[:built_model_step.len_rhs,:], ord=np.inf, axis = 0) for y1,y2 in zip(y_all,y_step)]
 err_y_alg = [np.linalg.norm(y1[built_model_step.len_rhs:,:]-y2[built_model_step.len_rhs:,:], ord=np.inf, axis = 0) for y1,y2 in zip(y_all,y_step)]
@@ -142,193 +151,68 @@ print("=" * 50)
 
 for cycle in range(num_cycles):
     print("\n" + "=" * 50)
-    print(f"Cycle {cycle}")
-    print(f"starting time difference:", err_t_start[cycle])
-    print(f"ending time difference:", err_t_last[cycle])
+    print("Cycle {cycle}")
+    print("starting time difference:", err_t_start[cycle])
+    print("ending time difference:", err_t_last[cycle])
     
-    print(f"starting state difference:", err_y[cycle][0])
-    print(f"starting differential state difference:", err_y_diff[cycle][0])
-    print(f"starting algebraic state difference:", err_y_alg[cycle][0])
+    print("starting state difference:", err_y[cycle][0])
+    print("starting differential state difference:", err_y_diff[cycle][0])
+    print("starting algebraic state difference:", err_y_alg[cycle][0])
     
-    print(f"ending state difference:", err_y[cycle][-1])
-    print(f"ending differential state difference:", err_y_diff[cycle][-1])
-    print(f"ending algebraic state difference:", err_y_alg[cycle][-1])
+    print("ending state difference:", err_y[cycle][-1])
+    print("ending differential state difference:", err_y_diff[cycle][-1])
+    print("ending algebraic state difference:", err_y_alg[cycle][-1])
     
-    start_error = np.linalg.norm(y_start_step[cycle] - y_start_all[cycle], ord=np.inf)
-    end_error = np.linalg.norm(y_last_step[cycle] - y_last_all[cycle], ord=np.inf)
-    print(start_error == err_y[cycle][0], end_error == err_y[cycle][-1])
-    print("=" * 50)
+    #start_error = np.linalg.norm(y_start_step[cycle] - y_start_all[cycle], ord=np.inf)
+    #end_error = np.linalg.norm(y_last_step[cycle] - y_last_all[cycle], ord=np.inf)
+    #print(start_error == err_y[cycle][0], end_error == err_y[cycle][-1])
+    print("=" * 50)  
     
+#%%    
+plt.figure()
+plt.semilogy(t_switch_all, "-o", color="red")
+plt.semilogy(t_switch_step, "-o")
+plt.xlabel(r"$t_{\Gamma}$")
+plt.ylabel(r"$t_+ - t_-$")
+
+plt.figure()
+plt.semilogy(err_y_diff_switch_all, "-o", color = "red")
+plt.semilogy(err_y_diff_switch_step, "-o")
+plt.xlabel(r"$t_{\Gamma}$ [s]")
+plt.ylabel(r"$\|y_{+,d} - y_{-,d}\|_{\infty}$")
+
+plt.figure()
+plt.semilogy(err_y_alg_switch_all, "-o", color="red")
+plt.semilogy(err_y_alg_switch_step, "-o")
+plt.xlabel(r"$t_{\Gamma}$ [s]")
+plt.ylabel(r"$\|y_{+,a} - y_{-,a}\|_{\infty}$")
+
+plt.show()
 
 #%%
-# state variables of the model
-for cycle in range(num_cycles-1):
-    fig, axes = plt.subplots(2, 3, figsize=(12, 4))
+# ------------------------------------------------------------
+# Mesh points
+# ------------------------------------------------------------
+# Spatial coordinates
+mesh = sim_step.mesh
 
-    all_old = solution["all"]["cycles"][cycle]
-    all_new = solution["all"]["cycles"][cycle + 1]
-    step_old = solution["step"]["cycles"][cycle]
-    step_new = solution["step"]["cycles"][cycle + 1]
+r_p = mesh["positive particle"].nodes
+x_p = mesh["positive electrode"].nodes
+x_s = mesh["separator"].nodes
+x = mesh["separator", "positive electrode"].nodes
 
-    # Switch times
-    t_minus_all = all_old.t[-1]
-    t_plus_all = all_new.t[0]
+results = {"all": solution_all.cycles[:], "step": solution_step[:]}
 
-    t_minus_step = step_old.t[-1]
-    t_plus_step = step_new.t[0]
+state_variable = lambda cycle, sol_type, state: results[sol_type][cycle][state]
+c_s_p = lambda cycle, sol_type: state_variable(cycle,sol_type, "Positive particle concentration [mol.m-3]")
+eps_c_e = lambda cycle, sol_type: state_variable(cycle,sol_type, "Porosity times concentration [mol.m-3]")
+ce = lambda cycle, sol_type: state_variable(cycle,sol_type, "ELectrolyte concentration [mol.m-3]")
 
-    # ------------------------------------------------------------
-    # State variables - sequential
-    # ------------------------------------------------------------
-    csp_all_old = all_old["Positive particle concentration [mol.m-3]"]
-    csp_all_new = all_new["Positive particle concentration [mol.m-3]"]
+phi_s_p = lambda cycle, sol_type: state_variable(cycle,sol_type,"Positive electrode potential [V]")
+phi_e = lambda cycle, sol_type: state_variable(cycle,sol_type,"Electrolyte potentiial [V]")
+Q_abs = lambda cycle, sol_type: state_variable(cycle,sol_type,"Throughput capacity [A.h]")
+Q_disch = lambda cycle, sol_type: state_variable(cycle,sol_type,"Discharge capacity [A.h]")
 
-    eps_ce_all_old = all_old["Porosity times concentration [mol.m-3]"]
-    eps_ce_all_new = all_new["Porosity times concentration [mol.m-3]"]
-
-    ce_all_old = all_old["Electrolyte concentration [mol.m-3]"]
-    ce_all_new = all_new["Electrolyte concentration [mol.m-3]"]
-
-    phi_sp_all_old = all_old["Positive electrode potential [V]"]
-    phi_sp_all_new = all_new["Positive electrode potential [V]"]
-
-    phi_e_all_old = all_old["Electrolyte potential [V]"]
-    phi_e_all_new = all_new["Electrolyte potential [V]"]
-
-    I_all_old = all_old["Current [A]"]
-    I_all_new = all_new["Current [A]"]
-
-    # ------------------------------------------------------------
-    # State variables - stepwise
-    # ------------------------------------------------------------
-
-    csp_step_old = step_old["Positive particle concentration [mol.m-3]"]
-    csp_step_new = step_new["Positive particle concentration [mol.m-3]"]
-
-    eps_ce_step_old = step_old["Porosity times concentration [mol.m-3]"]
-    eps_ce_step_new = step_new["Porosity times concentration [mol.m-3]"]
-
-    ce_step_old = step_old["Electrolyte concentration [mol.m-3]"]
-    ce_step_new = step_new["Electrolyte concentration [mol.m-3]"]
-
-    phi_sp_step_old = step_old["Positive electrode potential [V]"]
-    phi_sp_step_new = step_new["Positive electrode potential [V]"]
-
-    phi_e_step_old = step_old["Electrolyte potential [V]"]
-    phi_e_step_new = step_new["Electrolyte potential [V]"]
-
-    I_step_old = step_old["Current [A]"]
-    I_step_new = step_new["Current [A]"]
-
-    # ------------------------------------------------------------
-    # Mesh points
-    # ------------------------------------------------------------
-
-    r_p = all_old["r_p [m]"].entries[:, 0, 0]
-    x_p = all_old["x_p [m]"].entries[:, 0]
-
-    x_eps_ce = eps_ce_all_old.mesh.nodes
-    x_ce = ce_all_old.mesh.nodes
-
-    # ============================================================
-    # Particle concentration
-    # ============================================================
-    ax = axes[0, 0]
-    ax.plot(r_p * 1e6, csp_all_old.entries[:, -1, -1], "-", label=fr"All $t_s^-$")
-    ax.plot(r_p * 1e6, csp_all_new.entries[:, -1, 0], "--", label=fr"All $t_s^+$")
-    ax.plot(r_p * 1e6, csp_step_old.entries[:, -1, -1], ":", label=fr"Step $t_s^-$")
-    ax.plot(r_p * 1e6, csp_step_new.entries[:, -1, 0], "-.",label=fr"Step $t_s^+$")
-    ax.set_xlabel(r"$r$ [$\mu$m]")
-    ax.set_ylabel(r"$c_{s,p}$ [mol m$^{-3}$]")
-    ax.set_title("Particle concentration")
-    ax.grid()
-
-    # ============================================================
-    # Porosity times electrolyte concentration
-    # ============================================================
-    ax = axes[0, 1]
-    ax.plot(x_eps_ce * 1e6, eps_ce_all_old.entries[:, -1], "-")
-    ax.plot(x_eps_ce * 1e6, eps_ce_all_new.entries[:, 0], "--")
-    ax.plot(x_eps_ce * 1e6, eps_ce_step_old.entries[:, -1], ":")
-    ax.plot(x_eps_ce * 1e6, eps_ce_step_new.entries[:, 0],"-.")
-    ax.set_xlabel(r"$x$ [$\mu$m]")
-    ax.set_ylabel(r"$\epsilon c_e$ [mol m$^{-3}$]")
-    ax.set_title("Porosity times concentration")
-    ax.grid()
-
-    # ============================================================
-    # Electrolyte concentration
-    # ============================================================
-    ax = axes[0, 2]
-    ax.plot(x_ce * 1e6, ce_all_old.entries[:, -1], "-")
-    ax.plot(x_ce * 1e6, ce_all_new.entries[:, 0], "--")
-    ax.plot(x_ce * 1e6, ce_step_old.entries[:, -1], ":")
-    ax.plot(x_ce * 1e6, ce_step_new.entries[:, 0], "-.")
-    ax.set_xlabel(r"$x$ [$\mu$m]")
-    ax.set_ylabel(r"$c_e$ [mol m$^{-3}$]")
-    ax.set_title("Electrolyte concentration")
-    ax.grid()
-
-    # ============================================================
-    # Positive-electrode potential
-    # ============================================================
-    ax = axes[1, 0]
-    ax.plot(x_p * 1e6, phi_sp_all_old.entries[:, -1], "-")
-    ax.plot(x_p * 1e6, phi_sp_all_new.entries[:, 0], "--")
-    ax.plot(x_p * 1e6, phi_sp_step_old.entries[:, -1], ":")
-    ax.plot( x_p * 1e6, phi_sp_step_new.entries[:, 0], "-.")
-    ax.set_xlabel(r"$x_p$ [$\mu$m]")
-    ax.set_ylabel(r"$\phi_{s,p}$ [V]")
-    ax.set_title("Positive-electrode potential")
-    ax.grid()
-
-    # ============================================================
-    # Electrolyte potential
-    # ============================================================
-    ax = axes[1, 1]
-    ax.plot(x_ce * 1e6, phi_e_all_old.entries[:, -1], "-")
-    ax.plot(x_ce * 1e6, phi_e_all_new.entries[:, 0], "--")
-    ax.plot(x_ce * 1e6, phi_e_step_old.entries[:, -1],":")
-    ax.plot(x_ce * 1e6, phi_e_step_new.entries[:, 0], "-.")
-    ax.set_xlabel(r"$x$ [$\mu$m]")
-    ax.set_ylabel(r"$\phi_e$ [V]")
-    ax.set_title("Electrolyte potential")
-    ax.grid()
-
-    # ============================================================
-    # Applied current
-    # ============================================================
-
-    ax = axes[1, 2]
-    # sequential
-    ax.scatter(0, I_all_old.entries[-1], s=80, marker="o")
-    ax.scatter(1, I_all_new.entries[0], s=80, marker="o")
-    ax.plot([0, 1], [I_all_old.entries[-1], I_all_new.entries[0]], "-")
-    # stepwise
-    ax.scatter(0, I_step_old.entries[-1], s=80, marker="x")
-    ax.scatter(1, I_step_new.entries[0], s=80, marker="x")
-    ax.plot([0, 1], [I_step_old.entries[-1], I_step_new.entries[0]], "--")
-    ax.set_xticks([0, 1], [r"$t_s^-$", r"$t_s^+$"])
-    ax.set_ylabel(r"$I_{\mathrm{app}}$ [A]")
-    ax.set_title("Applied current")
-    ax.grid()
-
-
-    # ============================================================
-    # Title and common legend
-    # ============================================================
-    fig.suptitle((
-            f"Cycle {cycle + 1} → {cycle + 2} switch\n"
-            f"$t_s^-={t_minus_all:.16e}$ s, "
-            f"$t_s^+={t_plus_all:.16e}$ s"
-        ),
-        fontsize=14,
-        y=0.99,
-    )
-
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-
-    fig.legend(handles, labels, loc="lower center", ncol=4,)
-    fig.subplots_adjust( wspace=1, hspace=1, top=0.82, bottom=0.18)
-    plt.show()
-# %%
+t0 = 1000
+c_s_profile = c_s_p(0,"all")(t=t0, x=x0, r=r_p)
+plt.plot(r_p, c_s_profile, label=fr"$x={x0:.3e}$ m")
