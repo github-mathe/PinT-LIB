@@ -17,8 +17,7 @@ num_cycles = 2
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
-model_step = pybamm.lithium_ion.DFN(*args)
-model_all = pybamm.lithium_ion.DFN(*args)
+
 # Space discretization
 var_pts = {
     "x_n": 1,   # points in the negative electrode
@@ -27,20 +26,26 @@ var_pts = {
     "r_p": 30  # points in the radius of positive electrode
 }
 
-# Setup experiment
+# parameters
 parameter_values=pybamm.ParameterValues(
     bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
+# solver
+solver = pybamm.IDAKLUSolver()
 
-# construct the simulation for the stepwise solving from (cycle to cycle)
+# models
+model_step = pybamm.lithium_ion.DFN(*args)
+model_all = pybamm.lithium_ion.DFN(*args)
+
+# experiments
 experiment_step = batteryExperiment(nCycles, expType=exp)
 experiment_all = batteryExperiment(num_cycles,expType=exp)
-solver = pybamm.IDAKLUSolver()
+
+# simulations
 sim_all = pybamm.Simulation(model_all,
                             experiment=experiment_all,
                             parameter_values=parameter_values,
                             var_pts=var_pts,
                             solver=solver)
-
 sim_step = pybamm.Simulation(model_step,
                             experiment=experiment_step,
                             parameter_values=parameter_values,
@@ -51,68 +56,109 @@ sim_step = pybamm.Simulation(model_step,
 solution_all = sim_all.solve()
 
 # solve stepwise
+# no pybamm time correction
 init_sol = None
 solution_step = []
+t_step = []
+t_delta = 0.0
 for cycle in range(num_cycles):
     sol = sim_step.solve(starting_solution=init_sol)
     cycle_sol = sol.cycles[-1]
+    t_global = cycle_sol.t + t_delta
+    t_step.append(t_global)
+    t_delta = t_global[-1]
     solution_step.append(cycle_sol)
-    init_sol = cycle_sol.last_state
+    init_sol = cycle_sol.last_state.copy()
+    init_sol.t[-1] = 0
+    init_sol.all_ts[-1][-1] = 0
+    print("cycle_sol changed:", cycle_sol.t[-1] != t_global[-1])
+    
+print(f"Solved {num_cycles} cycles.")
 
+# check the size of the states
+# processed models
+built_model_all = solution_all.cycles[0].first_state.all_models[0]
+built_model_step = solution_step[0].first_state.all_models[0]
+len_t_all = [sol.t.shape[0] for sol in solution_all.cycles]
+len_t_step = [t.shape[0] for t in t_step]
+print("Same state vector size: ", built_model_all.len_rhs_and_alg== built_model_step.len_rhs_and_alg)
+print("Same differential state vector size: ", built_model_all.len_rhs== built_model_step.len_rhs)
+print("Same algebraic state vector size: ", built_model_all.len_alg== built_model_step.len_alg)
+print("Same time lengths: ", len_t_all == len_t_step)
+# data at the time interface = time at the switch between cycles
 
 #%%
-print(f"Solved {num_cycles} cycles.")
-print(f"Number of stored cycles: {len(solution_all.cycles)}\n")
+# interface times
 
-# extract the differential and algebraic states
-solution = {"step":{}, "all":{}}
+t_last_all = [sol.t[-1] for sol in solution_all.cycles]
+t_start_all = [sol.t[0] for sol in solution_all.cycles]
+t_switch_all = [t1-t2 for t1,t2 in zip(t_last_all[:-1],t_start_all[1:])]
 
-solution["step"]["cycles"] = solution_step[:]
-solution["all"]["cycles"] = solution_all.cycles[:]
-for key, data in solution.items():
-    cycles = data["cycles"]
-    built_model = cycles[0].first_state.all_models[0]
-    data["built_model"] = built_model
-    data["size_y"] = cycles[0].first_state.y.shape[0]
-    data["n_diff"] = built_model.concatenated_rhs.size
-    data["n_alg"] = built_model.concatenated_algebraic.size
-    data["t_minus"] = [cycles[cycle_id].t[-1] for cycle_id in range(num_cycles-1)]
-    data["t_plus"] = [cycles[cycle_id+1].t[0] for cycle_id in range(num_cycles-1)]
-    data["t_correction"] = [cycles[cycle_id+1].t[0]-cycles[cycle_id].t[-1] for cycle_id in range(num_cycles-1)]
-    data["y_minus"] = [cycles[cycle_id].y[:,-1] for cycle_id in range(num_cycles-1)]
-    data["y_plus"] = [cycles[cycle_id+1].y[:,0] for cycle_id in range(num_cycles-1)]
-    data["y_correction"] = [cycles[cycle_id+1].y[:,0]-cycles[cycle_id].y[:,-1] for cycle_id in range(num_cycles-1)]
-    data["y_diff_minus"] = [cycles[cycle_id].y[:built_model.concatenated_rhs.size,-1] for cycle_id in range(num_cycles-1)]
-    data["y_alg_minus"] = [cycles[cycle_id].y[built_model.concatenated_rhs.size:,-1] for cycle_id in range(num_cycles-1)]
-    data["y_diff_plus"] = [cycles[cycle_id+1].y[:built_model.concatenated_rhs.size,0] for cycle_id in range(num_cycles-1)]
-    data["y_alg_plus"] = [cycles[cycle_id+1].y[built_model.concatenated_rhs.size:,0] for cycle_id in range(num_cycles-1)]
-    data["y_diff_correction"] = [cycles[cycle_id+1].y[:built_model.concatenated_rhs.size,0]-cycles[cycle_id].y[:built_model.concatenated_rhs.size,-1] for cycle_id in range(num_cycles-1)]
-    data["y_alg_correction"] = [cycles[cycle_id+1].y[built_model.concatenated_rhs.size:,0]-cycles[cycle_id].y[built_model.concatenated_rhs.size:,-1] for cycle_id in range(num_cycles-1)]
+t_last_step = [t[-1] for t in t_step]
+t_start_step = [t[0] for t in t_step]
+t_switch_step = [t1-t2 for t1,t2 in zip(t_last_step[:-1],t_start_step[1:])]
 
-# check the size
-print("Same state vector size: ", solution["all"]["size_y"] == solution["step"]["size_y"])
-print("Same differential state vector size: ", solution["all"]["n_diff"] == solution["step"]["n_diff"])
-print("Same algebraic state vector size: ", solution["all"]["n_alg"] == solution["step"]["n_alg"])
+err_t_last = [t1-t2 for t1,t2 in zip(t_last_all,t_last_step)]
+err_t_start = [t1-t2 for t1,t2 in zip(t_start_all,t_start_step)]
 
+#interface states
+
+y_all = [sol.y for sol in solution_all.cycles]
+y_last_all = [sol.y[:,-1] for sol in solution_all.cycles]
+y_start_all = [sol.y[:,0] for sol in solution_all.cycles]
+y_switch_all = [y1-y2 for y1,y2 in zip(y_last_all[:-1],y_start_all[1:])]
+
+y_diff_last_all = [sol.y[:built_model_all.len_rhs,-1] for sol in solution_all.cycles]
+y_diff_start_all = [sol.y[:built_model_all.len_rhs,0] for sol in solution_all.cycles]
+y_diff_switch_all = [y1-y2 for y1,y2 in zip(y_diff_last_all[:-1],y_diff_start_all[1:])]
+
+y_alg_last_all = [sol.y[built_model_all.len_rhs:,-1] for sol in solution_all.cycles]
+y_alg_start_all = [sol.y[built_model_all.len_rhs:,0] for sol in solution_all.cycles]
+y_alg_switch_all = [y1-y2 for y1,y2 in zip(y_alg_last_all[:-1],y_alg_start_all[1:])]
+
+
+y_step = [sol.y for sol in solution_step]
+y_last_step = [sol.y[:,-1] for sol in solution_step]
+y_start_step = [sol.y[:,0] for sol in solution_step]
+y_switch_step = [y1-y2 for y1,y2 in zip(y_last_step[:-1],y_start_step[1:])]
+
+y_diff_last_step = [sol.y[:built_model_step.len_rhs,-1] for sol in solution_step]
+y_diff_start_step = [sol.y[:built_model_step.len_rhs,0] for sol in solution_step]
+y_diff_switch_step = [y1-y2 for y1,y2 in zip(y_diff_last_step[:-1],y_diff_start_step[1:])]
+
+y_alg_last_step =  [sol.y[built_model_step.len_rhs:,-1] for sol in solution_step]
+y_alg_start_step = [sol.y[built_model_step.len_rhs:,0] for sol in solution_step]
+y_alg_switch_step = [y1-y2 for y1,y2 in zip(y_alg_last_step[:-1],y_alg_start_step[1:])]
+
+err_y = [np.linalg.norm(y1-y2, ord=np.inf, axis = 0) for y1,y2 in zip(y_all,y_step)]
+err_y_diff = [np.linalg.norm(y1[:built_model_step.len_rhs,:]-y2[:built_model_step.len_rhs,:], ord=np.inf, axis = 0) for y1,y2 in zip(y_all,y_step)]
+err_y_alg = [np.linalg.norm(y1[built_model_step.len_rhs:,:]-y2[built_model_step.len_rhs:,:], ord=np.inf, axis = 0) for y1,y2 in zip(y_all,y_step)]
+
+#%%
 print("\n" + "=" * 50)
-print("CYCLE SWITCH COMPARISON")
+print("CYCLE COMPARISON between sequential and step solutions")
 print("=" * 50)
 
-for key, dict_sol in solution.items():
-    print(key, "solver")
-    print("Difference in times: ", solution[key]["t_correction"])
-    print("Difference in states: ", np.max(np.abs(solution[key]["y_correction"])))
-    print("Difference in diff states: ", np.max(np.abs(solution[key]["y_diff_correction"])))
-    print("Difference in alg states: ", np.max(np.abs(solution[key]["y_alg_correction"])))
-    print()
-# step vs sequantial solver
-print("Differences in states between step and sequential solutions\n")
-print("Delta t_minus:", [solution["step"]["t_minus"][num]-solution["all"]["t_minus"][num] for num in range(len(solution["all"]["t_minus"]))])
-print("Delta t_plus:", [solution["step"]["t_plus"][num]-solution["all"]["t_plus"][num] for num in range(len(solution["all"]["t_plus"]))])
-print("Delta y_minus:", np.max(np.abs([solution["step"]["y_minus"][num]-solution["all"]["y_minus"][num] for num in range(len(solution["all"]["y_minus"]))])))
-print("Delta y_plus:", np.max(np.abs([solution["step"]["y_plus"][num]-solution["all"]["y_plus"][num] for num in range(len(solution["all"]["y_plus"]))])))
-print("Delta y_diff_plus:", np.max(np.abs([solution["step"]["y_diff_plus"][num]-solution["all"]["y_diff_plus"][num] for num in range(len(solution["all"]["y_diff_plus"]))])))
-print("Delta y_alg_plus:", np.max(np.abs([solution["step"]["y_alg_plus"][num]-solution["all"]["y_alg_plus"][num] for num in range(len(solution["all"]["y_diff_plus"]))])))
+
+for cycle in range(num_cycles):
+    print("\n" + "=" * 50)
+    print(f"Cycle {cycle}")
+    print(f"starting time difference:", err_t_start[cycle])
+    print(f"ending time difference:", err_t_last[cycle])
+    
+    print(f"starting state difference:", err_y[cycle][0])
+    print(f"starting differential state difference:", err_y_diff[cycle][0])
+    print(f"starting algebraic state difference:", err_y_alg[cycle][0])
+    
+    print(f"ending state difference:", err_y[cycle][-1])
+    print(f"ending differential state difference:", err_y_diff[cycle][-1])
+    print(f"ending algebraic state difference:", err_y_alg[cycle][-1])
+    
+    start_error = np.linalg.norm(y_start_step[cycle] - y_start_all[cycle], ord=np.inf)
+    end_error = np.linalg.norm(y_last_step[cycle] - y_last_all[cycle], ord=np.inf)
+    print(start_error == err_y[cycle][0], end_error == err_y[cycle][-1])
+    print("=" * 50)
+    
 
 #%%
 # state variables of the model
