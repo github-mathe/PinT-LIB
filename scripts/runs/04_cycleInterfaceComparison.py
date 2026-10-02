@@ -312,7 +312,7 @@ def plot_current_profile(ax,cycle,sol_type,t,label=None):
     ax.set_ylabel(f"Applied current for cycle {cycle} [A]")
     return ax
 #%%
-x0 = x_p[-5]
+x0 = x_p[0]
 cycle = num_cycles-2
 t_minus = t_last_all[cycle]
 t_plus = t_start_all[cycle+1]
@@ -321,7 +321,7 @@ t_step_local = lambda cycle, idx: results["step"][cycle].t[idx]
 
 fig, ax = plt.subplots()
 plot_cs(ax, cycle, "all", t = t_minus, label=r"all: $t_\Gamma^-$", x=x0)
-plot_cs(ax, cycle, "all", t = t_plus, label=r"all: $t_\Gamma^+$",x=x0)
+plot_cs(ax, cycle+1, "all", t = t_plus, label=r"all: $t_\Gamma^+$",x=x0)
 plot_cs(ax, cycle, "step", t =  t_step_local(cycle, -1), label=r"step: $t_\Gamma^-$",x=x0)
 plot_cs(ax, cycle, "step", t =  t_step_local(cycle+1, 0), label=r"step: $t_\Gamma^+$",x=x0)
 ax.set_title(f"Cycle {cycle}: positive particle concentrtaion at x = {x0*1e6}")
