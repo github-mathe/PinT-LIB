@@ -17,10 +17,9 @@ class PararealModified:
         returning the propagation state for cycle n.
     """
 
-    def __init__(self, fine, coarse, make_state):
+    def __init__(self, fine, coarse):
         self.fine = fine
         self.coarse = coarse
-        self.make_state = make_state
 
     def solve(self, t0, u0, K, N):
         """
@@ -49,8 +48,8 @@ class PararealModified:
         
         U           =   np.empty((K+1, N+1), dtype = object)  
 
-        def parareal_state(k, n):
-            return self.make_state(TT[k, n], U[k, n], n)
+        # def parareal_state(k, n):
+        #     return self.make_state(TT[k, n], U[k, n], n)
 
         for k in range(K+1):
             U[k, 0]     =   copy.deepcopy(u0)
@@ -60,7 +59,7 @@ class PararealModified:
         # First coarse propagation
         print("Starting first coarse propagation...")
         for n in range(N):
-            TPG, UPG    =   self.coarse.propagate(parareal_state(0, n))
+            TPG, UPG    =   self.coarse.propagate(TT[0,n], U[0,n], cycle = n)
             TT[0,n+1]           =   TPG
             U[0, n+1]           =   copy.deepcopy(UPG)
 
@@ -70,10 +69,10 @@ class PararealModified:
         for k in range(K):  
             for n in range(N):
         
-                TPF, UPF     =    self.fine.propagate(parareal_state(k, n)) 
-                TPG, UPG     =    self.coarse.propagate(parareal_state(k, n))
+                TPF, UPF     =    self.fine.propagate(TT[k,n], U[k,n], cycle = n) 
+                TPG, UPG     =    self.coarse.propagate(TT[k,n], U[k,n], cycle = n)
                 
-                TPG_s, UPG_s =    self.coarse.propagate(parareal_state(k+1, n))
+                TPG_s, UPG_s =    self.coarse.propagate(TT[k+1,n], U[k+1,n], cycle = n)
                 TT[k+1, n+1] =    TPF - TPG + TPG_s 
                 U[k+1, n+1]  =    UPF - UPG + UPG_s   
         print("Parareal iterations completed.")

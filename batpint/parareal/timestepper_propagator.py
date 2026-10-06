@@ -1,5 +1,5 @@
 from batpint.parareal.base_propagator import Propagator    
-
+from batpint.parareal.propagation_state import PropagationState
 class TimeStepperPropagator(Propagator):
     """
     Propagator based on an event-driven TimeStepper.
@@ -10,12 +10,17 @@ class TimeStepperPropagator(Propagator):
         self.direction = direction
         self.terminate_cycle = terminate_cycle if terminate_cycle is not None else lambda state: False
         self.history = self.timestepper.history if self.timestepper.save_history else {"t": [], "u": []}
-
+        self.current_cycle = 0
+        
     @property
     def state(self):
         return self.timestepper.state
-
-    def propagate(self, state):
+    
+    def make_state(self, t, u, cycle):
+        return PropagationState(t, u, cycle, u_event=u)
+    
+    def propagate(self, t, u, cycle): 
+        state = self.make_state(t, u, cycle)
         self.timestepper.set_state(state)
         if self.terminate_cycle(self.timestepper.state):
             raise RuntimeError(
