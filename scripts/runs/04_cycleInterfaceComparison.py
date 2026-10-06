@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 half_cell = True
 exp = "CCCV" # GITT or CCCV
 nCycles = 1
-num_cycles = 200
+num_cycles = 10
 
 # Run script
 args = ({"working electrode": "positive"},) if half_cell else ()
@@ -58,16 +58,21 @@ solution_step = []
 t_step = []
 t_delta = 0.0
 for cycle in range(num_cycles):
+    
     sol = sim_step.solve(starting_solution=init_sol)
+    
     cycle_sol = sol.cycles[-1]
     t_global = cycle_sol.t + t_delta
     t_step.append(t_global)
     t_delta = t_global[-1]
     solution_step.append(cycle_sol)
+    
     init_sol = cycle_sol.last_state.copy()
     init_sol.t[-1] = 0
+    init_sol.t_eval[-1] = 0
     init_sol.all_ts[-1][-1] = 0
-    #print("cycle_sol time not changed:", cycle_sol.t[-1] != t_global[-1])
+    init_sol.all_t_evals[-1][-1] = 0
+
     
 print(f"Solved {num_cycles} cycles.")
 #%%
