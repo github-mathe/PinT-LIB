@@ -81,7 +81,7 @@ class DahlquistExact(IntegrationMethod):
 
         return (C * np.exp(lam_cycle * t_next) - (alpha * np.cos(alpha * t_next) + lam_cycle * np.sin(alpha * t_next)) / denominator)
 
-def solve_dahlquist_cycles(problem, method, dt, num_cycles, make_state, terminate_cycle = None, direction=1, save_history=True):
+def solve_dahlquist_cycles(problem, method, dt, num_cycles, terminate_cycle = None, direction=1, save_history=True):
     """
     solve_dahlquist solves the Dahlquist problem using the specified time stepper method.
     Args:
@@ -108,9 +108,9 @@ def solve_dahlquist_cycles(problem, method, dt, num_cycles, make_state, terminat
     
     for ev in range(num_cycles):
         
-        current_state = make_state(t_ev[ev], u_ev[ev], ev)
+        current_state = propagator.make_state(t_ev[ev], u_ev[ev], ev)
         states.append(current_state)
-        t_new, u_new = propagator.propagate(state=current_state)
+        t_new, u_new = propagator.propagate(t_ev[ev], u_ev[ev], ev)
 
         t_ev[ev+1] = t_new
         u_ev[ev+1] = u_new

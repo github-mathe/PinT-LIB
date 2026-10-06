@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import time
 from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact, solve_dahlquist_cycles
 from batpint.parareal.parareal import PararealModified
-from batpint.parareal.propagation_state import PropagationState
+#from batpint.parareal.propagation_state import PropagationState
 from batpint.timestepping.timestepper import TimeStepper
 from batpint.parareal.timestepper_propagator import TimeStepperPropagator
 
@@ -33,17 +33,17 @@ methodNum = DahlquistBE()
 methodEx = DahlquistExact()
 
 # define a function to create a PropagationState with the event value
-make_state = lambda t, u, cycle: PropagationState(t=t, u=u, cycle=cycle, u_event=u)
+#make_state = lambda t, u, cycle: PropagationState(t=t, u=u, cycle=cycle, u_event=u)
 
 # %%
 # Solve the Dahlquist problem for a number of cycles and plot the results
 # teNum and ueNum are the event times and values for the numerical solution
 # teTh and ueTh are the event times and values for the analytical solution
 
-num_cycles = 4 # number of cycles
+num_cycles = 5 # number of cycles
 try:    
-    tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtNum, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
-    tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dtEx, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+    tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtNum, num_cycles=num_cycles, terminate_cycle = terminate, save_history=True)
+    tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dtEx, num_cycles=num_cycles, terminate_cycle = terminate, save_history=True)
 
     # Plotting the results
     plt.plot(uNum.real, uNum.imag, label="Numerical")
@@ -62,8 +62,8 @@ err_ue = np.zeros_like(dtVals) # error in event values
 print(f"{'dt':>5} | {'te':>12} | {'ue':>18}")
 for i,dt in enumerate(dtVals):
     try:
-        tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
-        tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dt, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+        tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dt, num_cycles=num_cycles,  terminate_cycle = terminate, save_history=True)
+        tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dt, num_cycles=num_cycles, terminate_cycle = terminate, save_history=True)
     except Exception as e:
         print(f"An error occurred during the simulation: {e}")
         continue
@@ -104,7 +104,7 @@ plt.show()
 # Set up Parareal parameters
 N = num_cycles # time windows - coarse time grid
 K = N+1 # Parareal iterations
-dtF = 1/10000 # Fine solver's time steps
+dtF = 1/1000 # Fine solver's time steps
 dtG = 1/100  # Coarse solver's time steps
 
 timestepperF = TimeStepper(problem=problem, method=methodNum, dt=dtF, save_history=False)
@@ -113,7 +113,7 @@ propagatorF = TimeStepperPropagator(timestepper=timestepperF, direction=1, termi
 propagatorG = TimeStepperPropagator(timestepper=timestepperG, direction=1, terminate_cycle = terminate)
 
 # solve the Dahlquist problem using Parareal
-parareal = PararealModified(fine=propagatorF, coarse=propagatorG, make_state=make_state)
+parareal = PararealModified(fine=propagatorF, coarse=propagatorG)
 time_start = time.time()
 
 try:
@@ -131,7 +131,7 @@ print(f"Parareal execution ended in {total_time_parareal:.2f} seconds")
 time_start = time.time()
 
 try:
-    tFine, uFine, teFine, ueFine = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtF, num_cycles=num_cycles, make_state=make_state, terminate_cycle = terminate, save_history=True)
+    tFine, uFine, teFine, ueFine = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtF, num_cycles=num_cycles,  terminate_cycle = terminate, save_history=True)
 except Exception as e:
     print(f"An error occurred during the fine solver simulation: {e}")
 
@@ -177,6 +177,8 @@ plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
 plt.legend()  
 plt.tight_layout()  
 
+
+#%%
 # plotting the error vs N points
 fig = plt.figure(figsize=(12, 8))
 fig.suptitle(f"Adaptive Parareal Error for {N+1} cycles")
@@ -187,6 +189,8 @@ plt.axhline(y=err_teFine, color='red', linestyle='--', label="Fine solver error"
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
+plt.legend()  
+
 
 plt.subplot(1,2, 2)
 for k in range(K+1):
@@ -195,6 +199,8 @@ plt.axhline(y=err_ueFine, color='red', linestyle='--', label="Fine solver error"
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
+plt.legend()  
+
 plt.tight_layout()
 plt.show()
 
