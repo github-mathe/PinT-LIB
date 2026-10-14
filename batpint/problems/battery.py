@@ -41,5 +41,3 @@ def batteryExperiment(nCycles=10, expType="GITT"):
         raise NotImplementedError(f"{expType}")
 
     return experiment
-    
-    
