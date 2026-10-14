@@ -22,11 +22,13 @@ var_pts = {
 
 
 #%%
-num_cycles = 50
+num_cycles = 4
 # check cost and accuracy
-rtolCoarse = 1/(10**np.arange(2,8))
-rtolFine = 1e-7 # default
+rtolCoarse = 1/(10**np.arange(3,7))
+rtolFine = 1e-6 # default
 
+atolCoarse = 1e-6
+atolFine = 1e-6
 #atolCoarse = 1e-6
 #atolFine = 1e-6 # default
 
@@ -38,9 +40,10 @@ fine_propagator = PybammPropagator(
     experiment = batteryExperiment(nCycles, expType=exp),
     parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
     var_pts = var_pts,
-    solver=pybamm.IDAKLUSolver(rtol=rtolFine))
+    solver=pybamm.IDAKLUSolver(rtol=rtolFine, atol=atolFine))
 uStart = copy.deepcopy(fine_propagator.u_full)
 solutionFine[0] = uStart
+len_rhs = fine_propagator._last_step_model.len_rhs
 
 coarse_propagators = [
     PybammPropagator(
@@ -48,7 +51,7 @@ coarse_propagators = [
         experiment = batteryExperiment(nCycles, expType=exp),
         parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
         var_pts = var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtol_c),
+        solver=pybamm.IDAKLUSolver(rtol=rtol_c, atol=atolCoarse),
     )
     for rtol_c in rtolCoarse
 ]
@@ -63,6 +66,7 @@ tFine_cycles = np.zeros(num_cycles+1, dtype=float)
 
 err_t = np.zeros((len(rtolCoarse), num_cycles+1), dtype=float)
 err_u = np.zeros((len(rtolCoarse), num_cycles+1), dtype=float)
+err_u_diff = np.zeros((len(rtolCoarse), num_cycles+1), dtype=float)
 err_up = np.zeros((len(rtolCoarse), num_cycles+1), dtype=float)
 time_Fine_cycles = np.zeros(num_cycles+1) 
 time_Coarse_cycles = np.zeros((len(rtolCoarse), num_cycles+1))
@@ -70,13 +74,13 @@ time_Coarse_cycles = np.zeros((len(rtolCoarse), num_cycles+1))
 for cycle in range(num_cycles):
     
     # fine propagator
-    time_start_Fine = time.time()
+    time_start_Fine = time.perf_counter()
     tFine, solFine = fine_propagator.propagate(
         t=tFine_cycles[cycle],
         u=solutionFine[cycle],
         cycle=cycle)
-    time_end_Fine = time.time()
-    total_time_Fine = time_end_Fine - time_start_Fine
+
+    total_time_Fine = time.perf_counter() - time_start_Fine
     
     time_Fine_cycles[cycle+1] = total_time_Fine
     tFine_cycles[cycle+1] = tFine
@@ -85,21 +89,23 @@ for cycle in range(num_cycles):
     for i, rtolC in enumerate(rtolCoarse):
         err_t[i, 0] = np.abs(tFine_cycles[0]-tCoarse_cycles[i,0])
         err_u[i, 0] = np.linalg.norm(solutionFine[0][0] - solutionCoarse[i,0][0], ord=np.inf)
+        err_u_diff[i, 0] = np.linalg.norm(solutionFine[0][0][:len_rhs] - solutionCoarse[i,0][0][:len_rhs], ord=np.inf)
         err_up[i, 0] = np.linalg.norm(solutionFine[0][1] - solutionCoarse[i,0][1], ord=np.inf)
 
         # coarse propagator
-        time_start_coarse = time.time()
+        time_start_coarse = time.perf_counter()
         tCoarse, solCoarse = coarse_propagators[i].propagate(
             t=tCoarse_cycles[i,cycle],
             u=solutionCoarse[i,cycle],
             cycle=cycle)
-        time_end_coarse = time.time()
-        time_Coarse_cycles[i,cycle+1] = time_end_coarse - time_start_coarse
+
+        time_Coarse_cycles[i,cycle+1] = time.perf_counter() - time_start_coarse
         
         tCoarse_cycles[i,cycle+1] = tCoarse
         solutionCoarse[i,cycle+1] = solCoarse
         err_t[i, cycle+1] = np.abs(tFine-tCoarse)
         err_u[i, cycle+1] = np.linalg.norm(solFine[0] - solCoarse[0], ord=np.inf)
+        err_u_diff[i, cycle+1] = np.linalg.norm(solFine[0][:len_rhs] - solCoarse[0][:len_rhs], ord=np.inf)
         err_up[i, cycle+1] = np.linalg.norm(solFine[1] - solCoarse[1], ord=np.inf)
 
 #%%
@@ -130,5 +136,11 @@ ax.invert_xaxis()
 ax1.semilogx([rtolC/rtolFine for rtolC in rtolCoarse], time_cost, color="red", label = "cost")
 fig.legend()
 
+fig, ax = plt.subplots()   
+ax.semilogx([rtolC/rtolFine for rtolC in rtolCoarse], np.max(err_u_diff[:,1:], axis=1), label = r"$\|u_{diff,coarse}-u_{diff,fine}\|_{\infty}$")    
+ax1 = ax.twinx()
+ax.invert_xaxis()
+ax1.semilogx([rtolC/rtolFine for rtolC in rtolCoarse], time_cost, color="red", label = "cost")
+fig.legend()
 
 plt.show()

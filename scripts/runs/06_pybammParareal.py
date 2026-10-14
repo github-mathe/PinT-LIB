@@ -2,10 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Oct 14 10:32:00 2026
-
 @author: yessima
 """
-
 import pybamm
 import numpy as np
 import batpint.parameter.javid as bpar
@@ -15,8 +13,8 @@ from batpint.parareal.parareal import PararealModified
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import time
 import copy
+
 # Script parameters
 half_cell = True
 exp = "CCCV" # GITT or CCCV
@@ -30,34 +28,34 @@ var_pts = {
     "r_p": 30  # points in the radius of positive electrode
 }
 
-
-N = 100 # number of cycles
+# Parareal
+N = 4 # number of cycles
 K = N+1 # number of iterations
 
-# Parareal
-rtolCoarse = 1e-4
-rtolFine = 1e-7 
+rtolCoarse = 1e-5
+atolCoarse = 1e-6
 
-solutionParareal = np.empty((K, N), dtype=object)
+rtolFine = 1e-6
+atolFine = 1e-6
 
 fine_propagator = PybammPropagator(
     model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
     experiment = batteryExperiment(nCycles, expType=exp),
     parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
     var_pts = var_pts,
-    solver=pybamm.IDAKLUSolver(rtol=rtolFine))
+    solver=pybamm.IDAKLUSolver(rtol=rtolFine, atol=atolFine))
 
 tStart = 0
 uStart = copy.deepcopy(fine_propagator.u_full)
-for _ in range(N):
-    solutionParareal[_,0] = uStart
+
+len_rhs = fine_propagator._last_step_model.len_rhs
 
 coarse_propagator = PybammPropagator(
         model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
         experiment = batteryExperiment(nCycles, expType=exp),
         parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
         var_pts = var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtolCoarse)
+        solver=pybamm.IDAKLUSolver(rtol=rtolCoarse, atol=atolCoarse)
         )
 
 parareal = PararealModified(fine=fine_propagator, coarse=coarse_propagator)
@@ -83,16 +81,21 @@ for cycle in range(N):
 # error at the event points for the Parareal solver
 err_tParareal = np.zeros((K+1, N+1), dtype=float) # error in event times per cycle
 err_uParareal = np.zeros((K+1, N+1), dtype=object) # error in event values per cycle
+err_uDiffParareal = np.zeros((K+1, N+1), dtype=object) # error in event values per cycle
+err_uAlgParareal = np.zeros((K+1, N+1), dtype=object)
 err_upParareal = np.zeros((K+1, N+1), dtype=object)
 for k in range(K+1):
     for cycle in range(N+1):
         err_tParareal[k, cycle] = np.abs(TT[k, cycle] - tFine_cycles[cycle])
-        err_uParareal[k, cycle] = np.linalg.norm(U[k, cycle][0] - solutionFine[cycle][0])
-        err_upParareal[k, cycle] = np.linalg.norm(U[k, cycle][1] - solutionFine[cycle][1])
+        err_uParareal[k, cycle] = np.linalg.norm(U[k, cycle][0] - solutionFine[cycle][0], ord=np.inf)
+        err_uDiffParareal[k, cycle] = np.linalg.norm(U[k, cycle][0][:len_rhs] - solutionFine[cycle][0][:len_rhs], ord=np.inf)
+        err_uAlgParareal[k, cycle] = np.linalg.norm(U[k, cycle][0][len_rhs:] - solutionFine[cycle][0][len_rhs:], ord=np.inf)
+        err_upParareal[k, cycle] = np.linalg.norm(U[k, cycle][1] - solutionFine[cycle][1], ord=np.inf)
 
 #%%
 err_tPararealmax = np.max(err_tParareal, axis=1) # error in event times for the Parareal solver
 err_uPararealmax = np.max(err_uParareal, axis=1) # error in event values for the Parareal solver
+err_uDiffPararealmax = np.max(err_uDiffParareal, axis=1) 
 err_upPararealmax = np.max(err_upParareal, axis=1)
 # %%
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
@@ -103,7 +106,7 @@ ax_left.set_yscale('symlog', linthresh=1e-14)
 ax_left.set_xlabel("Parareal iteration k"), ax_left.set_ylabel("Error"), ax_left.grid();
 ax_left.set_xticks(range(K+1))
 
-ax_right.semilogy(range(K+1), err_uPararealmax, label=r'$\|u_{Parareal} - u_{FineNum}\|_\infty$')
+ax_right.semilogy(range(K+1), err_uDiffPararealmax, label=r'$\|u_{Parareal} - u_{FineNum}\|_\infty$')
 ax_twin = ax_right.twinx()
 ax_right.set_yscale('symlog', linthresh=1e-14)
 ax_twin.semilogy(range(K+1), err_upPararealmax,'--', label=r'$\|up_{Parareal} - up_{FineNum}\|_\infty$')
@@ -121,14 +124,13 @@ for k in range(K+1):
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
 plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
-plt.legend(handles=[
-    Line2D([0], [0], color='black', linestyle='-', label=r'$\|t_{Parareal} - t_{FineNum}\|_\infty$'),])
+plt.legend()
 
 fig, ax = plt.subplots(figsize=(12, 8), sharex=True)
 fig.suptitle(f"Adaptive Parareal Error for {N+1} cycles")
 ax1 = ax.twinx()
 for k in range(K+1):
-    ax.semilogy(range(N+1), err_uParareal[k,:], label=f"k={k}")
+    ax.semilogy(range(N+1), err_uDiffParareal[k,:], label=f"k={k}")
     ax.semilogy(range(N+1), err_upParareal[k,:],'--', label=f"k={k}")
 
 ax.set_xticks(range(N+1))
