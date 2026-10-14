@@ -30,7 +30,7 @@ rtolFine = 1e-7 # default
 #atolCoarse = 1e-6
 #atolFine = 1e-6 # default
 
-solutionFine =np.empty(num_cycles+1, dtype=object)
+solutionFine = np.empty(num_cycles+1, dtype=object)
 solutionCoarse = np.empty((len(rtolCoarse), num_cycles+1),dtype=object)
 
 fine_propagator = PybammPropagator(
