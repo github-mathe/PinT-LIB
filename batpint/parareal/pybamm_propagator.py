@@ -56,7 +56,7 @@ class PybammPropagator:
     
     @property
     def u_full(self):
-        return np.vstack((self._u_start, self._u_start))
+        return np.vstack((self._u_start, self._up_start))
     
     def _compute_one_step(self):
         # compute the strating solution
