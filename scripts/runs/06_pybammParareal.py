@@ -29,21 +29,20 @@ var_pts = {
 }
 
 # Parareal
-N = 4 # number of cycles
+N = 10 # number of cycles
 K = N+1 # number of iterations
 
 rtolCoarse = 1e-5
-atolCoarse = 1e-6
-
 rtolFine = 1e-6
-atolFine = 1e-6
+
+
 
 fine_propagator = PybammPropagator(
     model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
     experiment = batteryExperiment(nCycles, expType=exp),
     parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
     var_pts = var_pts,
-    solver=pybamm.IDAKLUSolver(rtol=rtolFine, atol=atolFine))
+    solver=pybamm.IDAKLUSolver(rtol=rtolFine))
 
 tStart = 0
 uStart = copy.deepcopy(fine_propagator.u_full)
@@ -55,10 +54,18 @@ coarse_propagator = PybammPropagator(
         experiment = batteryExperiment(nCycles, expType=exp),
         parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
         var_pts = var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtolCoarse, atol=atolCoarse)
+        solver=pybamm.IDAKLUSolver(rtol=rtolCoarse)
         )
 
-parareal = PararealModified(fine=fine_propagator, coarse=coarse_propagator)
+coarse_s_propagator = PybammPropagator(
+        model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
+        experiment = batteryExperiment(nCycles, expType=exp),
+        parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
+        var_pts = var_pts,
+        solver=pybamm.IDAKLUSolver(rtol=rtolCoarse)
+        )
+
+parareal = PararealModified(fine=fine_propagator, coarse=coarse_propagator, coarse_s=coarse_s_propagator)
 try:
     TT, U = parareal.solve(t0=tStart, u0=uStart, K=K, N=N)
 except Exception as e:
@@ -105,6 +112,7 @@ ax_left.semilogy(range(K+1), err_tPararealmax, label=r'$\|t_{Parareal} - t_{Fine
 ax_left.set_yscale('symlog', linthresh=1e-14)
 ax_left.set_xlabel("Parareal iteration k"), ax_left.set_ylabel("Error"), ax_left.grid();
 ax_left.set_xticks(range(K+1))
+fig.legend(loc = "center")
 
 ax_right.semilogy(range(K+1), err_uDiffPararealmax, label=r'$\|u_{Parareal} - u_{FineNum}\|_\infty$')
 ax_twin = ax_right.twinx()
