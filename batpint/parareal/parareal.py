@@ -17,9 +17,10 @@ class PararealModified:
         returning the propagation state for cycle n.
     """
 
-    def __init__(self, fine, coarse):
+    def __init__(self, fine, coarse, coarse_s):
         self.fine = fine
         self.coarse = coarse
+        self.coarse_s = coarse_s
 
     def solve(self, t0, u0, K, N):
         """
@@ -71,8 +72,8 @@ class PararealModified:
         
                 TPF, UPF     =    self.fine.propagate(TT[k,n], U[k,n], cycle = n) 
                 TPG, UPG     =    self.coarse.propagate(TT[k,n], U[k,n], cycle = n)
+                TPG_s, UPG_s =    self.coarse_s.propagate(TT[k+1,n], U[k+1,n], cycle = n)
                 
-                TPG_s, UPG_s =    self.coarse.propagate(TT[k+1,n], U[k+1,n], cycle = n)
                 TT[k+1, n+1] =    TPF - TPG + TPG_s 
                 U[k+1, n+1]  =    UPF - UPG + UPG_s   
         print("Parareal iterations completed.")
