@@ -157,3 +157,18 @@ class PybammPropagator:
         
         return t_next, np.vstack((u_next, up_next))
     
+    def solve(self, t, u, cycle):
+        
+        if cycle == 0:
+            starting_solution = None
+        else:
+            starting_solution = self.make_starting_solution(u)
+        
+        solution = self.sim.solve(
+            starting_solution=starting_solution,
+        )
+        cycle_solution = solution.cycles[-1]
+        t_next_local, u_next, up_next = self.extract_state(cycle_solution)
+        t_next = t + t_next_local
+        
+        return t_next, np.vstack((u_next, up_next)), solution
