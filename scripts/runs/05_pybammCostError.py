@@ -24,11 +24,11 @@ var_pts = {
 #%%
 num_cycles = 4
 # check cost and accuracy
-rtolCoarse = 1/(10**np.arange(3,7))
+rtolCoarse = 1/(10**np.arange(2,7))
 rtolFine = 1e-6 # default
 
-atolCoarse = 1e-6
-atolFine = 1e-6
+#atolCoarse = 1e-6
+#atolFine = 1e-6
 #atolCoarse = 1e-6
 #atolFine = 1e-6 # default
 
@@ -40,7 +40,7 @@ fine_propagator = PybammPropagator(
     experiment = batteryExperiment(nCycles, expType=exp),
     parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
     var_pts = var_pts,
-    solver=pybamm.IDAKLUSolver(rtol=rtolFine, atol=atolFine))
+    solver=pybamm.IDAKLUSolver(rtol=rtolFine))
 uStart = copy.deepcopy(fine_propagator.u_full)
 solutionFine[0] = uStart
 len_rhs = fine_propagator._last_step_model.len_rhs
@@ -51,7 +51,7 @@ coarse_propagators = [
         experiment = batteryExperiment(nCycles, expType=exp),
         parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
         var_pts = var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtol_c, atol=atolCoarse),
+        solver=pybamm.IDAKLUSolver(rtol=rtol_c),
     )
     for rtol_c in rtolCoarse
 ]
@@ -86,10 +86,11 @@ for cycle in range(num_cycles):
     tFine_cycles[cycle+1] = tFine
     solutionFine[cycle+1] = solFine
     
+    
     for i, rtolC in enumerate(rtolCoarse):
         err_t[i, 0] = np.abs(tFine_cycles[0]-tCoarse_cycles[i,0])
         err_u[i, 0] = np.linalg.norm(solutionFine[0][0] - solutionCoarse[i,0][0], ord=np.inf)
-        err_u_diff[i, 0] = np.linalg.norm(solutionFine[0][0][:len_rhs] - solutionCoarse[i,0][0][:len_rhs], ord=np.inf)
+        err_u_diff[i, 0] =  np.linalg.norm(solutionFine[0][0][:len_rhs] - solutionCoarse[i,0][0][:len_rhs], ord=np.inf)
         err_up[i, 0] = np.linalg.norm(solutionFine[0][1] - solutionCoarse[i,0][1], ord=np.inf)
 
         # coarse propagator
