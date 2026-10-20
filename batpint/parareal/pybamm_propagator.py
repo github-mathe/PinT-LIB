@@ -100,7 +100,7 @@ class PybammPropagator:
         if u.size != self._state_size:
             raise ValueError(
                 "Returned interface-state size mismatch: "
-                f"received {u.size}, expected {self.state_size}."
+                f"received {u.size}, expected {self._state_size}."
             )
         
         return t, u, up
@@ -166,6 +166,7 @@ class PybammPropagator:
         
         solution = self.sim.solve(
             starting_solution=starting_solution,
+            inputs=self.inputs
         )
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
