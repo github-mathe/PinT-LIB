@@ -38,17 +38,17 @@ rtolFine = 1e-10
 
 # define the fine and coarse propagators
 fine_propagator = PybammPropagator(
-    model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
-    experiment = batteryExperiment(nCycles, expType=exp),
-    parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
-    var_pts = var_pts,
+    model=pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
+    experiment=batteryExperiment(nCycles, expType=exp),
+    parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
+    var_pts=var_pts,
     solver=pybamm.IDAKLUSolver(rtol=rtolFine))
 
 coarse_propagator = PybammPropagator(
-        model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
-        experiment = batteryExperiment(nCycles, expType=exp),
-        parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
-        var_pts = var_pts,
+        model=pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
+        experiment=batteryExperiment(nCycles, expType=exp),
+        parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
+        var_pts=var_pts,
         solver=pybamm.IDAKLUSolver(rtol=rtolCoarse)
         )
 
@@ -99,12 +99,13 @@ errU_diff_max = np.max(errU_diff, axis=1) # error in event times for the Pararea
 errTT_max = np.max(errTT, axis=1) # error in event times for the Parareal solver
 
 # plot error
+# plot error per iteration
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT_max, errU_diff_max, K, N)
 ax_left.legend(labels=["time error"], loc="upper right")
 ax_right.legend(labels=["state error"], loc="upper right") 
 
-
+# plot error per cycle
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU_diff, K, N)
 fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)

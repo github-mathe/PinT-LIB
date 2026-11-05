@@ -191,16 +191,16 @@ for k in range(U.shape[0]):
         U_complex[k, cycle] = U[k, cycle][1][0] + 1j*U[k, cycle][0][0]
 
 # compute the time and state errors at the event points for the Parareal solver
-# error at the event points for the Parareal solver
 errTT = compute_parareal_errors(TT, tFine_cycles)
 errU = compute_parareal_errors(U_complex, uFine_cycles)
 
-# plot the errors per iteration and per cycle
+# plot the errors per iteration
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT[:,-1], errU[:,-1], K=K, N=N)
 ax_left.legend(labels=["time error"], loc="upper right")
 ax_right.legend(labels=["state error"], loc="upper right") 
 
+# plot the errors per cycle
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU, K=K, N=N)
 fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)
