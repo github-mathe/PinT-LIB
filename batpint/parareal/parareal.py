@@ -17,10 +17,11 @@ class PararealModified:
         returning the propagation state for cycle n.
     """
 
-    def __init__(self, fine, coarse, coarse_s):
+    def __init__(self, fine, coarse, coarse_s, first_guess = None):
         self.fine = fine
         self.coarse = coarse
         self.coarse_s = coarse_s
+        self.first_guess = "coarse" if first_guess is None else "fine"
 
     def solve(self, t0, u0, K, N):
         """
@@ -49,8 +50,6 @@ class PararealModified:
         
         U           =   np.empty((K+1, N+1), dtype = object)  
 
-        # def parareal_state(k, n):
-        #     return self.make_state(TT[k, n], U[k, n], n)
 
         for k in range(K+1):
             U[k, 0]     =   copy.deepcopy(u0)
@@ -58,9 +57,13 @@ class PararealModified:
         print("Initialization completed.")
         
         # First coarse propagation
-        print("Starting first coarse propagation...")
+        print(f"Starting first guess with {self.first_guess} propagation...")
+        
         for n in range(N):
-            TPG, UPG    =   self.coarse.propagate(TT[0,n], U[0,n], cycle = n)
+            if self.first_guess == "coarse":
+                TPG, UPG    =   self.coarse.propagate(TT[0,n], U[0,n], cycle = n)
+            if self.first_guess == "fine":
+                TPG, UPG    =   self.fine.propagate(TT[0,n], U[0,n], cycle = n)
             TT[0,n+1]           =   TPG
             U[0, n+1]           =   copy.deepcopy(UPG)
 
