@@ -51,6 +51,7 @@ def pybammDahlquist(uStart, lam, alpha):
     param.process_model(model)
     disc.process_model(model)
     return model
+
 # create a propagator class for the Dahlquist problem
 class MyPropagator(Propagator):
     def __init__(
@@ -191,7 +192,8 @@ for k in range(U.shape[0]):
 
 # compute the time and state errors at the event points for the Parareal solver
 # error at the event points for the Parareal solver
-errTT, errU = compute_parareal_errors(TT, U_complex, tFine_cycles, uFine_cycles)
+errTT = compute_parareal_errors(TT, tFine_cycles)
+errU = compute_parareal_errors(U_complex, uFine_cycles)
 
 # plot the errors per iteration and per cycle
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)

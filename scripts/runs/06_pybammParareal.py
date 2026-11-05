@@ -36,6 +36,7 @@ K = N+1 # number of iterations
 rtolCoarse = 1e-9
 rtolFine = 1e-10
 
+# define the fine and coarse propagators
 fine_propagator = PybammPropagator(
     model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
     experiment = batteryExperiment(nCycles, expType=exp),
@@ -83,25 +84,28 @@ except Exception as e:
 
 # extract differential state
 Udiff = np.empty(U.shape, dtype=object)
+# we don't analyze the derivatives of U: UP
+# because they are recomputed with every solver step
+# Tested when use same U but different UP, results are the same, so we can ignore UP
+# UPdiff = np.empty(U.shape, dtype=object)
 for k in range(U.shape[0]):
     for cycle in range(U.shape[1]):
         Udiff[k, cycle] = U[k, cycle][0][:len_rhs]
-        
+
 # error at the event points for the Parareal solver
-errTT, errU_diff = compute_parareal_errors(TT, Udiff, TFine, UFine_diff)
+errTT = compute_parareal_errors(TT,TFine)
+errU_diff = compute_parareal_errors(Udiff,UFine_diff)
 errU_diff_max = np.max(errU_diff, axis=1) # error in event times for the Parareal solver
 errTT_max = np.max(errTT, axis=1) # error in event times for the Parareal solver
 
 # plot error
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
-fig.suptitle(f"Adaptive Parareal Error for {N+1} cycles")
 ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT_max, errU_diff_max, K, N)
 ax_left.legend(labels=["time error"], loc="upper right")
 ax_right.legend(labels=["state error"], loc="upper right") 
 
 
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
-fig.suptitle(f"Adaptive Parareal Error for {N+1} cycles")
 ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU_diff, K, N)
 fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)
 plt.tight_layout()  
