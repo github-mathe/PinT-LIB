@@ -59,8 +59,10 @@ len_rhs = fine_propagator._last_step_model.len_rhs
 
 # exact numerical solution
 UFine = np.empty(N+1, dtype=object)
+UFine_diff = np.empty(N+1, dtype=object)
 TFine = np.zeros(N+1, dtype=float)
 UFine[0] = uStart
+UFine_diff[0] = uStart[0][:len_rhs]
 for cycle in range(N):
     # fine propagator
     tFine, solFine = fine_propagator.propagate(
@@ -69,11 +71,7 @@ for cycle in range(N):
         cycle=cycle)    
     TFine[cycle+1] = tFine
     UFine[cycle+1] = solFine
-
-# extract only states of differential equations and not algebraic
-UFine_diff = np.empty(UFine.shape, dtype=object)
-for cycle, state in enumerate(UFine):
-    UFine_diff[cycle] = state[0][:len_rhs]
+    UFine_diff[cycle+1] = solFine[0][:len_rhs]
 
 # solve parareal
 parareal = PararealModified(fine=fine_propagator, coarse=coarse_propagator, coarse_s=coarse_propagator)
