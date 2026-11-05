@@ -49,7 +49,97 @@ class Dahlquist(Problem):
             lam=lam,
             alpha=alpha,
         )
-      
+        
+    def solve_dahlquist_exact_local(self, t, cycle, t_start, u_start):
+        lam_cycle = self.params["lam"](cycle)
+        denominator = self.params["alpha"]**2 + lam_cycle**2
+        C = np.exp(-lam_cycle * t_start) * \
+            (u_start + (self.params["alpha"] * np.cos(self.params["alpha"] * t_start) \
+            + lam_cycle * np.sin(self.params["alpha"] * t_start)) / denominator)
+        U = (C * np.exp(lam_cycle * (t)) - (self.params["alpha"] * np.cos(self.params["alpha"] * t) +\
+            lam_cycle * np.sin(self.params["alpha"] * t)) / denominator)
+        return U
+    
+    def solve_dahlquist_exact(self, t):
+        if t < self.t_start:
+            raise ValueError("Target time must be > = initial time")
+        T = self.t_start
+        U = self.u_start
+        cycle = 0
+        
+        while True:
+            lam_cycle = self.params["lam"](cycle)
+            P = 2*np.pi/np.abs(lam_cycle)
+            T_next = T+P
+            if t <= T_next: 
+                return self.solve_dahlquist_exact_local(t, cycle, T, U)
+            U = self.solve_dahlquist_exact_local(T_next, cycle, T, U) 
+            T = T_next
+            cycle += 1
+            
+    def solve_dahlquist_exact_cycles(self, num_cycles, dt=1e-3):
+        """Compute the exact solution over multiple cycles."""
+    
+        t_ev = np.zeros(num_cycles + 1)
+        u_ev = np.zeros(num_cycles + 1, dtype=complex)
+    
+        t_ev[0] = self.t_start
+        u_ev[0] = self.u_start
+    
+        t_all = []
+        u_all = []
+    
+        for cycle in range(num_cycles):
+    
+            lam = self.params["lam"](cycle)
+    
+            # Homogeneous period
+            P = 2 * np.pi / np.abs(lam)
+    
+            # Next cycle endpoint
+            t_ev[cycle + 1] = t_ev[cycle] + P
+    
+            # Exact solution at the endpoint
+            u_ev[cycle + 1] = self.solve_dahlquist_exact_local(
+                t_ev[cycle + 1],
+                cycle,
+                t_ev[cycle],
+                u_ev[cycle]
+            )
+    
+            # Time grid for the current cycle
+            n_steps = max(1, int(np.ceil(P / dt)))
+    
+            t_cycle = np.linspace(
+                t_ev[cycle],
+                t_ev[cycle + 1],
+                n_steps + 1
+            )
+    
+            # Exact solution on the local time grid
+            u_cycle = self.solve_dahlquist_exact_local(
+                t_cycle,
+                cycle,
+                t_ev[cycle],
+                u_ev[cycle]
+            )
+    
+            t_all.append(t_cycle)
+            u_all.append(u_cycle)
+        t_all = np.concatenate([
+                t if i == 0 else t[1:]
+                for i, t in enumerate(t_all)
+            ])
+            
+        u_all = np.concatenate([
+            u if i == 0 else u[1:]
+            for i, u in enumerate(u_all)
+        ])
+        
+        return t_all, u_all, t_ev, u_ev
+                    
+    
+        
 class DahlquistBE(IntegrationMethod):
     """
     Backward Euler method specialized for the Dahlquist problem.
@@ -80,7 +170,9 @@ class DahlquistExact(IntegrationMethod):
         C = np.exp(-lam_cycle * t) * (u + (alpha * np.cos(alpha * t) + lam_cycle * np.sin(alpha * t)) / denominator)
 
         return (C * np.exp(lam_cycle * t_next) - (alpha * np.cos(alpha * t_next) + lam_cycle * np.sin(alpha * t_next)) / denominator)
-
+    
+        
+        
 def solve_dahlquist_cycles(problem, method, dt, num_cycles, terminate_cycle = None, direction=1, save_history=True):
     """
     solve_dahlquist solves the Dahlquist problem using the specified time stepper method.
@@ -124,3 +216,4 @@ def solve_dahlquist_cycles(problem, method, dt, num_cycles, terminate_cycle = No
         u_all.extend(u_local[1:])
         
     return np.asarray(t_all), np.asarray(u_all), np.asarray(t_ev), np.asarray(u_ev)
+
