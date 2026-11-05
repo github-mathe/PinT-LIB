@@ -1,8 +1,9 @@
 import numpy as np
 import pybamm
 import copy
+from batpint.parareal.base_propagator import Propagator    
 
-class PybammPropagator:
+class PybammPropagator(Propagator):
     """
     Propagate a numerical PyBaMM state through one complete experiment.
 
@@ -18,6 +19,8 @@ class PybammPropagator:
         solver=None,
         inputs=None,
         experiment_model_mode="legacy",
+        eps_time = None, 
+        eps_state = None
     ):
         self.inputs = {} if inputs is None else dict(inputs)
 
@@ -42,6 +45,8 @@ class PybammPropagator:
         self._initial_solution = self._compute_one_step()
         self._t_start, self._u_start, self._up_start = self.extract_state(self._initial_solution)
         
+        self.eps_time = eps_time
+        self.eps_state = eps_state
     @property
     def t_start(self):
         return self._t_start
@@ -154,8 +159,13 @@ class PybammPropagator:
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
+        U = np.vstack((u_next, up_next))
+        if self.eps_time:
+            t_next = t_next + self.eps_time
+        if self.eps_state:
+            U = U + self.eps_state
         
-        return t_next, np.vstack((u_next, up_next))
+        return t_next, U
     
     def solve(self, t, u, cycle):
         
@@ -171,5 +181,6 @@ class PybammPropagator:
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
-        
-        return t_next, np.vstack((u_next, up_next)), solution
+        if self.eps_time & self.eps_state:
+            return t_next+self.eps_time, np.vstack((u_next, up_next))+self.eps_state, cycle_solution
+        return t_next, np.vstack((u_next, up_next)), cycle_solution
