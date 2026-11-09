@@ -4,17 +4,15 @@
 Created on Wed Oct 14 10:32:00 2026
 @author: yessima
 """
-import pybamm
-import numpy as np
-import batpint.parameter.javid as bpar
-from batpint.problems.battery import batteryExperiment
-from batpint.parareal.pybamm_propagator import PybammPropagator
-from batpint.parareal.parareal import PararealModified
-from batpint.parareal.errors import compute_parareal_errors
-from batpint.parareal.plot import plot_error_per_iteration, plot_error_per_cycle
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 import copy
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from batpint.parareal.errors import compute_parareal_errors
+from batpint.parareal.parareal import PararealModified
+from batpint.parareal.plot import plot_error_per_cycle, plot_error_per_iteration
+from batpint.problems.battery import make_propagator
 
 # Script parameters
 half_cell = True
@@ -37,20 +35,8 @@ rtolCoarse = 1e-9
 rtolFine = 1e-10
 
 # define the fine and coarse propagators
-fine_propagator = PybammPropagator(
-    model=pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
-    experiment=batteryExperiment(nCycles, expType=exp),
-    parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
-    var_pts=var_pts,
-    solver=pybamm.IDAKLUSolver(rtol=rtolFine))
-
-coarse_propagator = PybammPropagator(
-        model=pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
-        experiment=batteryExperiment(nCycles, expType=exp),
-        parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
-        var_pts=var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtolCoarse)
-        )
+fine_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolFine)
+coarse_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolCoarse)
 
 # initial conditions
 tStart = 0
@@ -68,7 +54,7 @@ for cycle in range(N):
     tFine, solFine = fine_propagator.propagate(
         t=TFine[cycle],
         u=UFine[cycle],
-        cycle=cycle)    
+        cycle=cycle)
     TFine[cycle+1] = tFine
     UFine[cycle+1] = solFine
     UFine_diff[cycle+1] = solFine[0][:len_rhs]
@@ -101,11 +87,11 @@ errTT_max = np.max(errTT, axis=1) # error in event times for the Parareal solver
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT_max, errU_diff_max, K, N)
 ax_left.legend(labels=["time error"], loc="upper right")
-ax_right.legend(labels=["state error"], loc="upper right") 
+ax_right.legend(labels=["state error"], loc="upper right")
 
 # plot error per cycle
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU_diff, K, N)
 fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)
-plt.tight_layout()  
+plt.tight_layout()
 plt.show()

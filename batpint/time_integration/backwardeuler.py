@@ -1,5 +1,7 @@
 import numpy as np
+
 from batpint.time_integration.base_method import IntegrationMethod
+
 
 class BackwardEuler(IntegrationMethod):
     """
@@ -13,7 +15,7 @@ class BackwardEuler(IntegrationMethod):
     def step(self, t, u, h, rhs, jacobian=None):
         """
         Perform a single Backward Euler step.
-        
+
         Parameters:
         rhs : callable
             The right-hand side function of the ODE.
@@ -36,17 +38,15 @@ class BackwardEuler(IntegrationMethod):
         # Define the residual function for the implicit equation
         def residual(u_new):
             return u_new - u - h * rhs(t_new, u_new)
+
         residual_jacobian = None
         if jacobian is not None:
+
             def residual_jacobian(u_new):
                 Jf = jacobian(t_new, u_new)
                 if np.ndim(Jf) == 0:
                     return 1.0 - h * Jf
-                return np.eye(Jf.shape[0]) - h * Jf      
+                return np.eye(Jf.shape[0]) - h * Jf
 
         # Use the algebraic solver to solve for u_new
-        return self.algebraic_solver.solve(
-            residual,
-            x0=np.copy(u),
-            residual_jacobian=residual_jacobian
-            )
+        return self.algebraic_solver.solve(residual, x0=np.copy(u), residual_jacobian=residual_jacobian)

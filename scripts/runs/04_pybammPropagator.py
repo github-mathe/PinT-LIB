@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import pybamm
 import numpy as np
-import batpint.parameter.javid as bpar
-from batpint.problems.battery import batteryExperiment
-from batpint.parareal.pybamm_propagator import PybammPropagator
+import pybamm
+
+from batpint.problems.battery import batteryExperiment, make_dfm_model, make_parameter_values, make_propagator
 
 # Script parameters
 half_cell = True
@@ -24,19 +23,12 @@ var_pts = {
 # Run script
 def make_simulation():
     """Create an independent DFN simulation."""
-    
-    args = ({"working electrode": "positive"},) if half_cell else ()
-    model = pybamm.lithium_ion.DFN(*args)
-    parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
-    experiment = batteryExperiment(nCycles, expType=exp)
-    solver = pybamm.IDAKLUSolver()
-
     return pybamm.Simulation(
-        model,
-        experiment=experiment,
-        parameter_values=parameter_values,
+        make_dfm_model(half_cell),
+        experiment=batteryExperiment(nCycles, expType=exp),
+        parameter_values=make_parameter_values(half_cell),
         var_pts=var_pts,
-        solver=solver,
+        solver=pybamm.IDAKLUSolver(),
     )
 
 sim = make_simulation()
@@ -53,22 +45,18 @@ solution_propagator=[]
 # store global times per cycle
 t_all = []
 t_propagator = [0]
-# time diff between cycles 
+# time diff between cycles
 t_delta = 0.0
 
 # %%
 
-pybamm_propagator = PybammPropagator(
-    model = pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
-    experiment = batteryExperiment(nCycles, expType=exp),
-    parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
-    var_pts = var_pts)
+pybamm_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts)
 uStart = pybamm_propagator.u_full
 solution_propagator.append(uStart)
 
 # compute
 for cycle in range(num_cycles):
-    
+
     tNext, sol_propagator = pybamm_propagator.propagate(
         t = t_propagator[cycle],
         u = solution_propagator[cycle],
@@ -85,10 +73,10 @@ for cycle in range(num_cycles):
     t_global = cycle_sol.t + t_delta
     t_all.append(t_global)
     t_delta = t_global[-1]
-    # create a solution object 
+    # create a solution object
     # with times 0 and states from the last state of the present solution cycle
     init_sol = pybamm.Solution(
-        all_ts=np.array([0.0]), 
+        all_ts=np.array([0.0]),
         all_ys=np.array(sol_end.all_ys[-1],copy=True),
         all_models=sol_end.all_models[-1],
         all_inputs=sol_end.all_inputs[-1],
@@ -98,8 +86,8 @@ for cycle in range(num_cycles):
         options=sol_end.user_options,
         all_t_evals=None)
 
-#%%    
-# check cycle end times 
+#%%
+# check cycle end times
 t_all_ends = [t[-1] for t in t_all]
 diff_t_ends = [t1-t2 for t1,t2 in zip(t_all_ends, t_propagator[1:])]
 not_zero_t = np.nonzero(diff_t_ends)

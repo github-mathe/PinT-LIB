@@ -1,10 +1,9 @@
 #%%
-import pybamm
-import numpy as np
-import batpint.parameter.javid as bpar
-from batpint.problems.battery import batteryExperiment
 import matplotlib.pyplot as plt
+import numpy as np
+import pybamm
 
+from batpint.problems.battery import batteryExperiment, make_dfm_model, make_parameter_values
 
 # Script parameters
 half_cell = True
@@ -22,23 +21,12 @@ var_pts = {
 
 def make_simulation(nCycles):
     """Create an independent DFN simulation."""
-
-    args = ({"working electrode": "positive"},) if half_cell else ()
-
-    model = pybamm.lithium_ion.DFN(*args)
-
-    parameter_values=pybamm.ParameterValues(
-        bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
-
-    experiment = batteryExperiment(nCycles, expType=exp)
-    solver = pybamm.IDAKLUSolver()
-
     return pybamm.Simulation(
-        model,
-        experiment=experiment,
-        parameter_values=parameter_values,
+        make_dfm_model(half_cell),
+        experiment=batteryExperiment(nCycles, expType=exp),
+        parameter_values=make_parameter_values(half_cell),
         var_pts=var_pts,
-        solver=solver,
+        solver=pybamm.IDAKLUSolver(),
     )
 
 
@@ -62,19 +50,19 @@ solution_from_new = []
 t_last = []
 t_new = []
 
-# time diff between cycles 
+# time diff between cycles
 t_delta_last = 0.0
 t_delta_new = 0.0
 
 # first solving type to solve using the solution from the previous cycle
 # without time correction by resetting times of the startinng solution to 0
- 
+
 for cycle in range(num_cycles):
-    
+
     sol_last = sim_from_last.solve(starting_solution=init_sol_last)
 
     cycle_sol = sol_last.cycles[-1]
-    
+
     # global times of the cycle
     t_global_last = cycle_sol.t + t_delta_last
     # store the global time per cycle
@@ -97,7 +85,7 @@ for cycle in range(num_cycles):
 # of the very first cycle computed before
 #%%
 start_sol = solution_from_last[0].first_state.copy()
-init_sol_new = pybamm.Solution(all_ts=np.array([0.0]), 
+init_sol_new = pybamm.Solution(all_ts=np.array([0.0]),
                               all_ys=np.array(start_sol.all_ys[-1],copy=True),
                               all_models=start_sol.all_models[-1],
                               all_inputs=start_sol.all_inputs[-1],
@@ -111,21 +99,21 @@ init_sol_new = pybamm.Solution(all_ts=np.array([0.0]),
 # %%
 # compute again
 for cycle in range(num_cycles):
-    
+
     sol_new = sim_from_new.solve(starting_solution=init_sol_new)
-    
+
     cycle_sol = sol_new.cycles[-1]
-    
+
     solution_from_new.append(cycle_sol)
-    
+
     sol_end = cycle_sol.last_state.copy()
     # global times of the cycle
     t_global_new = cycle_sol.t + t_delta_new
     t_new.append(t_global_new)
     t_delta_new = t_global_new[-1]
-    # create a solution object 
+    # create a solution object
     # with times 0 and states from the last state of the present solution cycle
-    init_sol_new = pybamm.Solution(all_ts=np.array([0.0]), 
+    init_sol_new = pybamm.Solution(all_ts=np.array([0.0]),
                                   all_ys=np.array(sol_end.all_ys[-1],copy=True),
                                   all_models=sol_end.all_models[-1],
                                   all_inputs=sol_end.all_inputs[-1],
@@ -134,17 +122,17 @@ for cycle in range(num_cycles):
                                   y_event=None,
                                   options=sol_end.user_options,
                                   all_t_evals=None)
-    
+
 results = {
     "all": solution_all.cycles[:],
     "from_last": solution_from_last[:],
-    "from_new": solution_from_new[:],                           
+    "from_new": solution_from_new[:],
     }
 
 times = {
     "all": [sol.t for sol in solution_all.cycles],
     "from_last": t_last[:],
-    "from_new": t_new[:],                           
+    "from_new": t_new[:],
     }
 
 print(f"Solved {num_cycles} cycles.")
@@ -205,22 +193,22 @@ for i in range(num_cycles):
     for position, (key, sol) in enumerate(results.items()):
         yStart_per_cycle[i, position] = sol[i].y[:,0]
         yEnd_per_cycle[i, position] = sol[i].y[:,-1]
-        
+
         ypStart_per_cycle[i, position] = sol[i].yp[:,0]
         ypEnd_per_cycle[i, position] = sol[i].yp[:,-1]
         if i==0: continue
         ySwitch_per_cycle[i, position] = yStart_per_cycle[i, position] - yEnd_per_cycle[i-1, position]
         ypSwitch_per_cycle[i, position] = ypStart_per_cycle[i, position] - ypEnd_per_cycle[i-1, position]
-        
+
         err_ySwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position], ord=np.inf)
         err_yDiffSwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position][:len_rhs], ord=np.inf)
         err_yAlgSwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position][len_rhs:], ord=np.inf)
-        
+
         err_ypSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position], ord=np.inf)
         err_ypDiffSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position][:len_rhs], ord=np.inf)
         err_ypAlgSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position][len_rhs:], ord=np.inf)
 
-#%%    
+#%%
 # Interface differences at cycle interfaces.
 colors = ["#D55E00", "#0072B2", "#009E73"]
 solver_labels = [f"Solver '{key}'" for key in results]
@@ -331,7 +319,7 @@ Q_abs = "Throughput capacity [A.h]"
 Q_discharge = "Discharge capacity [A.h]"
 current_profile = "Current [A]"
 # interface states
-# solid 
+# solid
 
 def plot_state(ax, cycle, sol_type, t_id, state_var, x_id=None):
     var = state_variable(cycle, sol_type, state_var)
@@ -365,7 +353,6 @@ for state_var in [c_s_p, eps_ce, phi_s_p, phi_e, current_profile, Q_discharge]:
     for position, key in enumerate(results):
         plot_state(ax, cycle, key, t_id, state_var, x_id=x_id)
         labels[position] = key + f" at t = {times[key][cycle][t_id]:.2f} s"
-        hold = True
     ax.legend(labels)
 
 plt.show()

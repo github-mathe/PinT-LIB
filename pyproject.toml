@@ -20,3 +20,24 @@ maintainers = [
     {name = "Thibaut Lunet", email = "thibaut.lunet@tuhh.de"},
 ]
 readme = "README.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "E731", "E701"]  # line length handled by formatter; lambdas and compact one-liners are idiomatic in this codebase
+
+[tool.ruff.lint.isort]
+known-first-party = ["batpint"]

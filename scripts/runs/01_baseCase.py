@@ -1,10 +1,15 @@
-import pybamm
-import numpy as np
-from time import time
 from pprint import pp as pprint
-from batpint import plt
+from time import time
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pybamm
+
 import batpint.parameter.javid as bpar
-from batpint.problems.battery import batteryProblem
+from batpint.plotting import configure_matplotlib
+from batpint.problems.battery import batteryExperiment
+
+configure_matplotlib()
 
 # Script parameters
 half_cell = True
@@ -33,7 +38,7 @@ var_pts = {
 parameter_values=pybamm.ParameterValues(
     bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
 
-experiment = batteryProblem(nCycles, expType=exp)
+experiment = batteryExperiment(nCycles, expType=exp)
 
 # Setup solver
 if sType == "CASADI":
@@ -81,7 +86,7 @@ plt.xlabel('Time [h]'), plt.ylabel('Voltage [V]')
 plt.grid(True), plt.legend()
 
 if showTimeSteps:
-    deltas = np.ediff1d(np.concat(sol.all_ts))
+    deltas = np.ediff1d(np.concatenate(sol.all_ts))
     deltas /= voltage.max()*10
     deltas += 2
 

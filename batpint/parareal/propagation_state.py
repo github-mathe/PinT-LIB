@@ -1,6 +1,7 @@
 import copy
 
-class PropagationState: 
+
+class PropagationState:
     """
     State associated with one propagation.
 
@@ -12,9 +13,10 @@ class PropagationState:
         Initial state of the propagation.
     cycle : int
         Cycle / propagation index.
-    **kwargs : 
+    **kwargs :
         Additional dynamic attributes associated with this propagation.
     """
+
     def __init__(self, t, u, cycle, **kwargs):
         self.t = t
         self.u = copy.deepcopy(u)

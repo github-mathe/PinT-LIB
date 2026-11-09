@@ -1,6 +1,6 @@
 # Meeting Notes
 
-## 14/08/2026
+## 14/08/2025
 
 🛠️ **First thoughts**
 
