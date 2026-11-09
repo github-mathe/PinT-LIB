@@ -1,7 +1,7 @@
 # LLM Fixes — BATPINT Repository Audit
 
-**Applied by:** Mistral Vibe (CLI coding agent built by Mistral AI)
-**Date:** 2026-11-09
+**Applied by:** Mistral Large 4\
+**Date:** 2026-11-09\
 **Scope:** Full repository audit with 22 findings, all implemented. No commits made.
 
 ---
