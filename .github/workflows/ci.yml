@@ -2,7 +2,7 @@ name: CI pipeline ⚙️
 
 on:
   push:
-    branches: [main]
+    branches: [main, tibo]
   pull_request:
 
 jobs:
