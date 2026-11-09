@@ -21,7 +21,7 @@ class PararealModified:
         self.fine = fine
         self.coarse = coarse
         self.coarse_s = coarse_s
-        self.first_guess = "coarse" if first_guess is None else "fine"
+        self.first_guess = "coarse" if first_guess is None else first_guess
 
     def solve(self, t0, u0, K, N):
         """
@@ -49,16 +49,15 @@ class PararealModified:
         TT[:,0]     =   t0
         
         U           =   np.empty((K+1, N+1), dtype = object)  
-
-
+        
         for k in range(K+1):
             U[k, 0]     =   copy.deepcopy(u0)
-
+            
         print("Initialization completed.")
         
         # First coarse propagation
         print(f"Starting first guess with {self.first_guess} propagation...")
-        
+
         for n in range(N):
             if self.first_guess == "coarse":
                 TPG, UPG    =   self.coarse.propagate(TT[0,n], U[0,n], cycle = n)
@@ -67,18 +66,21 @@ class PararealModified:
             TT[0,n+1]           =   TPG
             U[0, n+1]           =   copy.deepcopy(UPG)
 
+            
         print("First coarse propagation completed.")
         print("Starting Parareal iterations...")
+
         # Parareal iterations
         for k in range(K):  
             for n in range(N):
         
                 TPF, UPF     =    self.fine.propagate(TT[k,n], U[k,n], cycle = n) 
                 TPG, UPG     =    self.coarse.propagate(TT[k,n], U[k,n], cycle = n)
-                TPG_s, UPG_s =    self.coarse_s.propagate(TT[k+1,n], U[k+1,n], cycle = n)
+                TPG_s, UPG_s =    self.coarse_s.propagate(TT[k+1,n], U[k+1,n], cycle = n) 
                 
-                TT[k+1, n+1] =    TPF - TPG + TPG_s 
-                U[k+1, n+1]  =    UPF - UPG + UPG_s   
+                TT[k+1, n+1] =    TPF  + (TPG_s - TPG)
+                U[k+1, n+1]  =    np.sum([UPF , UPG_s,- UPG], axis=0, dtype=np.longdouble)
+                
         print("Parareal iterations completed.")
         return TT, U
     
