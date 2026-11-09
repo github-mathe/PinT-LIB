@@ -14,6 +14,8 @@ from batpint.parareal.parareal import PararealModified
 from batpint.parareal.errors import compute_parareal_errors
 from batpint.parareal.plot import plot_error_per_iteration, plot_error_per_cycle
 import matplotlib.pyplot as plt
+from matplotlib.legend_handler import HandlerTuple
+
 import json
 from pathlib import Path
 import copy
@@ -37,8 +39,8 @@ var_pts = {
             }
 
 # set tolerances
-rtolFine = 1e-7
-rtolCoarse = 1e-7
+rtolFine = 1e-4
+rtolCoarse = 1e-4
 
 # define propagatoros
 fine_propagator = PybammPropagator(
@@ -72,7 +74,7 @@ solutionFine[0] = uStart
 solutionFine_diff[0] = uStart[0][:len_rhs]
 
 for cycle in range(N):
-    tFine, solFine = exact_propagator.propagate(
+    tFine, solFine = fine_propagator.propagate(
                                                 t=tFine_cycles[cycle],
                                                 u=solutionFine[cycle],
                                                 cycle=cycle
@@ -84,10 +86,13 @@ for cycle in range(N):
 
 # define small perturbation in state and time solution
 eps_times = [0]
-eps_states = [1e-3] #1/10**np.arange(12, 11,-1)
+eps_states = 1/10**np.arange(10, 1,-1)
 
 # solve Parareal
 try:
+    fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True, layout="constrained")
+    markers = ['o', 's', '^', 'v', 'D', '*', '+', 'x', 'p', '8']
+    labels_state=[]
     for idxT, eps_time in enumerate(eps_times):
         for idxS, eps_state in enumerate(eps_states):
             
@@ -115,19 +120,42 @@ try:
             errU_diff = compute_parareal_errors(Udiff, solutionFine_diff)
             errTT_max = np.max(errTT, axis=1) # error in event times for the Parareal solver
             errU_diff_max = np.max(errU_diff, axis=1)
+            
+            # plot error per cycle
+            labels_state.append(r"$\epsilon_{state}=$" + f"{eps_state}")
+            plot_error_per_iteration(
+                                    ax_left, 
+                                    ax_right, 
+                                    errTT_max, 
+                                    errU_diff_max, 
+                                    K, 
+                                    N, 
+                                    marker=markers[idxS], 
+                                    linewidth=1, 
+                                    left_style={"color":"red"},
+                                    right_style={"color":"blue"})
+    handles = list(zip(ax_left.lines, ax_right.lines))
+    fig.legend(
+                handles,
+                labels_state, 
+                loc='outside upper center', 
+                ncols=4,
+                handler_map={tuple: HandlerTuple(ndivide=None)},
+                )
+
 except Exception as e:
         print(f"Parareal execution failed: {e}")
-
+#%%
 # plot error
 # plot error per iteration
-fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
-ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT_max, errU_diff_max, K, N)
-ax_left.legend(labels=["time error"], loc="upper right")
-ax_right.legend(labels=["state error"], loc="upper right") 
+# fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
+# ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT_max, errU_diff_max, K, N)
+# ax_left.legend(labels=["time error"], loc="upper right")
+# ax_right.legend(labels=["state error"], loc="upper right") 
 
-# plot error per cycle
-fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
-ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU_diff, K, N)
-fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)
-plt.tight_layout()  
-plt.show()
+# # plot error per cycle
+# fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
+# ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU_diff, K, N)
+# fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)
+# plt.tight_layout()  
+# plt.show()
