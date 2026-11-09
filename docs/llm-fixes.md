@@ -72,9 +72,6 @@
 
 ### 17. Removed unused `hold = True` in `03_cycleInterfaceComparison.py`
 
-### 18. Cleaned `notes.md`
-- Removed unresolved ❓ questions; kept the useful solver documentation.
-
 ### 19. Fixed date in `docs/meetings.md`
 - `14/08/2026` → `14/08/2025`.
 
