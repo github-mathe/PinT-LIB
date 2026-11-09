@@ -20,16 +20,34 @@ maintainers = [
     {name = "Thibaut Lunet", email = "thibaut.lunet@tuhh.de"},
 ]
 readme = "README.md"
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/github-mathe/PinT-LIB"
+Tracker = "https://github.com/github-mathe/PinT-LIB/issues"
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-timeout",
     "ruff",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+pythonpath = ["."]
+addopts = "-v --tb=short --timeout=300"
 
 [tool.ruff]
 line-length = 120

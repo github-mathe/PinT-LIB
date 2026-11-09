@@ -1,7 +1,7 @@
 # LLM Fixes — BATPINT Repository Audit
 
 **Applied by:** Mistral Vibe (CLI coding agent built by Mistral AI)
-**Date:** 2026-08-28
+**Date:** 2026-11-09
 **Scope:** Full repository audit with 22 findings, all implemented. No commits made.
 
 ---
@@ -104,12 +104,12 @@
 
 ---
 
-## CI & Test Infrastructure (added 2026-08-28)
+## CI & Test Infrastructure (added 2026-11-09)
 
 ### GitHub Actions workflow: `.github/workflows/ci.yml`
-- **Test job:** matrix on Python 3.10, 3.12, 3.13 — installs `.[dev]`, runs `pytest tests/ -v`
+- **Test job:** matrix on Python 3.10, 3.12, 3.13 — installs `.[dev]`, runs `pytest tests/ -v --tb=short`
 - **Lint job:** Python 3.13 — runs `ruff check` on `batpint/ tests/ scripts/runs/` and `ruff format --check` on `batpint/ tests/`
-- Triggers on push/PR to `main`
+- Triggers on push to `main` and on all pull requests
 
 ### Test suite: `tests/` (40 tests, all passing)
 | File | Tests | Covers |
@@ -121,9 +121,15 @@
 | `test_battery.py` | 11 | Param structure (shared base, half/full specifics), experiment creation (GITT, CCCV, invalid), factory functions |
 
 ### Config: `pyproject.toml`
-- `[tool.pytest.ini_options]` — testpaths, verbose output
+- `[tool.pytest.ini_options]` — testpaths, `pythonpath`, `--timeout=300`
 - `[tool.ruff]` — line-length 120, target py310, select E/F/W/I, ignore E501/E731/E701
-- `dev` extras: `pytest`, `ruff`
+- `dev` extras: `pytest`, `pytest-timeout`, `ruff`
 
 ### Bug found & fixed during CI setup
 - **`PybammPropagator` incompatible with pybamm ≥ 25.x:** `Simulation.__init__` no longer accepts `experiment_model_mode`. Removed the parameter from `PybammPropagator.__init__` and the `Simulation` call. Without this fix, `make_propagator()` and all scripts 04–07 crash with `TypeError`.
+
+### CI improvements (qmat-inspired, 2026-11-09)
+- **`pull_request` trigger** — now fires on all PRs, not just to `main`.
+- **Emoji labels** — job and step names carry emoji (⚙️ 🧪 🐍 📦 ✨ 🍋 🔍 💅).
+- **`pyproject.toml` upgrades** — classifiers, `[project.urls]`, `license`, `pytest-timeout` in dev extras, `pythonpath = ["."]`, `--timeout=300` in pytest addopts.
+- **`.gitignore`** — added `__pycache__/`, `.pytest_cache/`, `.coverage*`, `htmlcov/`, `coverage.xml`.
