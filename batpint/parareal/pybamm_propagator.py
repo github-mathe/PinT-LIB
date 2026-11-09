@@ -148,10 +148,11 @@ class PybammPropagator(Propagator):
             up_next : numpy.ndarray
                 derivatives of u.
         """
+        u = copy.deepcopy(u)
         if cycle == 0:
             starting_solution = None
         else:
-            starting_solution = self.make_starting_solution(u)
+            starting_solution = self.make_starting_solution(u.astype(np.float64))
         
         solution = self.sim.solve(
             starting_solution=starting_solution,
@@ -159,11 +160,11 @@ class PybammPropagator(Propagator):
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
-        U = np.vstack((u_next, up_next))
+        U = np.vstack((u_next, up_next), dtype=np.longdouble)
         if self.eps_time:
             t_next = t_next + self.eps_time
         if self.eps_state:
-            U = U + self.eps_state
+            U = np.add(U,np.longdouble(self.eps_state), dtype=np.longdouble)
         
         return t_next, U
     
