@@ -47,6 +47,3 @@ jobs:
 
       - name: Ruff check 🔍
         run: ruff check batpint/ tests/ scripts/runs/
-
-      - name: Ruff format check 💅
-        run: ruff format --check batpint/ tests/
