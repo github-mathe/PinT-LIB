@@ -36,7 +36,8 @@ class PybammPropagator(Propagator):
         self._state_size = self._last_step_model.len_rhs_and_alg
 
         self._initial_solution = self._compute_one_step()
-        self._t_start, self._u_start, self._up_start = self.extract_state(self._initial_solution)
+        self._t_start, self._u_start, self._up_start = \
+            self.extract_state(self._initial_solution)
 
         self.eps_time = eps_time
         self.eps_state = eps_state

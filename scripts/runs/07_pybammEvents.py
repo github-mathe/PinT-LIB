@@ -5,7 +5,6 @@ Created on Thu Oct 15 12:25:18 2026
 
 @author: yessima
 """
-import copy
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -24,39 +23,42 @@ results_dir.mkdir(parents=True, exist_ok=True)
 # Script parameters
 half_cell = True
 exp = "CCCV" # GITT or CCCV
-nCycles = 1
-N = 5
-K = N
+nCycles = 5             # number of Parareal windows, 1 battery cycle per window
+nIterations = nCycles   # number of Parareal iterations
 # Space discretization
 var_pts = {
-            "x_n": 1,   # points in the negative electrode
-            "x_s": 10,  # points in the separator
-            "x_p": 10,  # points in the positive electrode
-            "r_p": 30  # points in the radius of positive electrode
-            }
+    "x_n": 1,   # points in the negative electrode
+    "x_s": 10,  # points in the separator
+    "x_p": 10,  # points in the positive electrode
+    "r_p": 30   # points in the radius of positive electrode
+    }
 
 # set tolerances
 rtolFine = 1e-4
 rtolCoarse = 1e-4
 
 # define propagators
-fine_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolFine)
+fine_propagator = make_propagator(
+    half_cell=half_cell, exp=exp, var_pts=var_pts, rtol=rtolFine)
 
 
 # set initial conditions
 tStart = 0
-uStart = copy.deepcopy(fine_propagator.u_full)
-len_rhs = fine_propagator._last_step_model.len_rhs # check only differential equations variables 0:len_rhs
+uStart = fine_propagator.u_full[0].copy()
+nDOF = uStart.size
+
+# -- check only differential equations variables 0:len_rhs
+len_rhs = fine_propagator._last_step_model.len_rhs
 
 #%%
 # exact numerical solution
-solutionFine = np.empty(N+1, dtype=object)
-tFine_cycles = np.zeros(N+1, dtype=float)
+solutionFine = np.empty((nCycles+1, nDOF))
+tFine_cycles = np.zeros(nCycles+1)
 solutionFine_diff = np.empty(solutionFine.shape, dtype=object)
 solutionFine[0] = uStart
 solutionFine_diff[0] = uStart[0][:len_rhs]
 
-for cycle in range(N):
+for cycle in range(nCycles):
     tFine, solFine = fine_propagator.propagate(
                                                 t=tFine_cycles[cycle],
                                                 u=solutionFine[cycle],
@@ -80,12 +82,12 @@ try:
         for idxS, eps_state in enumerate(eps_states):
 
             coarse_propagator = make_propagator(
-                half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts,
+                half_cell=half_cell, exp=exp, var_pts=var_pts,
                 rtol=rtolCoarse, eps_state=eps_state, eps_time=eps_time,
             )
 
             parareal = PararealModified(fine=fine_propagator, coarse=coarse_propagator, coarse_s=coarse_propagator)
-            TT, U = parareal.solve(t0=tStart, u0=uStart, K=K, N=N)
+            TT, U = parareal.solve(t0=tStart, u0=uStart, K=nIterations, N=nCycles)
 
             # extract differential state
             Udiff = np.empty(U.shape, dtype=object)
@@ -106,8 +108,8 @@ try:
                                     ax_right,
                                     errTT_max,
                                     errU_diff_max,
-                                    K,
-                                    N,
+                                    nIterations,
+                                    nCycles,
                                     marker=markers[idxS],
                                     linewidth=1,
                                     left_style={"color":"red"},

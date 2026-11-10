@@ -79,7 +79,7 @@ class PararealModified:
                 TPG_s, UPG_s = self.coarse_s.propagate(TT[k + 1, n], U[k + 1, n], cycle=n)
 
                 TT[k + 1, n + 1] = TPF + (TPG_s - TPG)
-                U[k + 1, n + 1] = np.sum([UPF, UPG_s, -UPG], axis=0, dtype=np.longdouble)
+                U[k + 1, n + 1] = np.sum([UPF, UPG_s, -UPG], axis=0, dtype=np.double)
 
         print("Parareal iterations completed.")
         return TT, U
