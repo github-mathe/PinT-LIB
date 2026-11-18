@@ -160,12 +160,11 @@ class PybammPropagator(Propagator):
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
-        U = np.vstack((u_next, up_next), dtype=np.longdouble)
+        U = np.vstack((u_next, up_next))#, dtype=np.longdouble)
         if self.eps_time:
             t_next = t_next + self.eps_time
         if self.eps_state:
-            U = np.add(U,np.longdouble(self.eps_state), dtype=np.longdouble)
-        
+            U[0][122:] = np.add(U[0][122:], self.eps_state*np.ones_like(U[0][122:]))#, dtype=np.longdouble)
         return t_next, U
     
     def solve(self, t, u, cycle):
