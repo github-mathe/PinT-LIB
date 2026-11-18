@@ -35,12 +35,16 @@ var_pts = {
             "x_n": 1,   # points in the negative electrode
             "x_s": 10,  # points in the separator
             "x_p": 10,  # points in the positive electrode
-            "r_p": 30  # points in the radius of positive electrode
+            "r_p": 10  # points in the radius of positive electrode
             }
 
 # set tolerances
 rtolFine = 1e-4
 rtolCoarse = 1e-4
+solver_options = {
+    "linear_solver":"SUNLinSol_Dense", 
+    "jacobian":"dense", 
+    "max_order_bdf":1}
 
 # define propagatoros
 fine_propagator = PybammPropagator(
@@ -48,7 +52,7 @@ fine_propagator = PybammPropagator(
                     experiment=batteryExperiment(nCycles, expType=exp),
                     parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
                     var_pts=var_pts,
-                    solver=pybamm.IDAKLUSolver(rtol=rtolFine)
+                    solver=pybamm.IDAKLUSolver(rtol=rtolFine, options=solver_options)
                     )
 
 
@@ -59,14 +63,6 @@ len_rhs = fine_propagator._last_step_model.len_rhs # check only differential equ
 
 #%%
 # exact numerical solution
-exact_propagator = PybammPropagator(
-                    model=pybamm.lithium_ion.DFN(*({"working electrode": "positive"},) if half_cell else ()),
-                    experiment=batteryExperiment(nCycles, expType=exp),
-                    parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
-                    var_pts=var_pts,
-                    solver=pybamm.IDAKLUSolver(rtol=rtolFine)
-                    )
-
 solutionFine = np.empty(N+1, dtype=object)
 tFine_cycles = np.zeros(N+1, dtype=float)
 solutionFine_diff = np.empty(solutionFine.shape, dtype=object)
@@ -86,7 +82,7 @@ for cycle in range(N):
 
 # define small perturbation in state and time solution
 eps_times = [0]
-eps_states = 1/10**np.arange(10, 1,-1)
+eps_states = 1/10**np.arange(3, 0,-1)
 
 # solve Parareal
 try:
@@ -101,7 +97,7 @@ try:
                                                 experiment=batteryExperiment(nCycles, expType=exp),
                                                 parameter_values=pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS),
                                                 var_pts=var_pts,
-                                                solver=pybamm.IDAKLUSolver(rtol=rtolCoarse),
+                                                solver=pybamm.IDAKLUSolver(rtol=rtolCoarse, options=solver_options),
                                                 eps_state=eps_state,
                                                 eps_time=eps_time
                                                 )
@@ -142,7 +138,7 @@ try:
                 ncols=4,
                 handler_map={tuple: HandlerTuple(ndivide=None)},
                 )
-
+    plt.show()
 except Exception as e:
         print(f"Parareal execution failed: {e}")
 #%%
