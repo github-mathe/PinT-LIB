@@ -49,10 +49,10 @@ class PararealModified:
         TT[:,0]     =   t0
         
         U           =   np.empty((K+1, N+1), dtype = object)  
-        
+        #UEx           =   np.empty((N+1), dtype = object)  
         for k in range(K+1):
             U[k, 0]     =   copy.deepcopy(u0)
-            
+            #UEx[0] = copy.deepcopy(u0)
         print("Initialization completed.")
         
         # First coarse propagation
@@ -65,13 +65,14 @@ class PararealModified:
                 TPG, UPG    =   self.fine.propagate(TT[0,n], U[0,n], cycle = n)
             TT[0,n+1]           =   TPG
             U[0, n+1]           =   copy.deepcopy(UPG)
-
-            
+            #_, uex = self.fine.propagate(TT[0,n], UEx[n].copy(), cycle = n)
+           # UEx[n+1] = copy.deepcopy(uex)
         print("First coarse propagation completed.")
         print("Starting Parareal iterations...")
 
         # Parareal iterations
-        for k in range(K):  
+        for k in range(K):                 
+
             for n in range(N):
         
                 TPF, UPF     =    self.fine.propagate(TT[k,n], U[k,n], cycle = n) 
@@ -79,10 +80,11 @@ class PararealModified:
                 TPG_s, UPG_s =    self.coarse_s.propagate(TT[k+1,n], U[k+1,n], cycle = n) 
                 
                 TT[k+1, n+1] =    TPF  + (TPG_s - TPG)
-                U[k+1, n+1]  =    np.sum([UPF , UPG_s,- UPG], axis=0, dtype=np.longdouble)
+                U[k+1, n+1]  =    (UPF + (UPG_s - UPG))
                 
         print("Parareal iterations completed.")
         return TT, U
+    
     
 def PararealOld(F, G, t0, u0, N, K):
     
