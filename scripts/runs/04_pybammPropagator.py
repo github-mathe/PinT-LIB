@@ -15,8 +15,8 @@ num_cycles = 50
 # Space discretization
 var_pts = {
     "x_n": 1,   # points in the negative electrode
-    "x_s": 30,  # points in the separator
-    "x_p": 30,  # points in the positive electrode
+    "x_s": 10,  # points in the separator
+    "x_p": 10,  # points in the positive electrode
     "r_p": 30  # points in the radius of positive electrode
 }
 
@@ -65,7 +65,7 @@ pybamm_propagator = PybammPropagator(
     var_pts = var_pts)
 uStart = pybamm_propagator.u_full
 solution_propagator.append(uStart)
-
+state_size =  pybamm_propagator.state_size
 # compute
 for cycle in range(num_cycles):
     
@@ -107,8 +107,8 @@ print("Difference in end times of cycles: ", not_zero_t)
 #check end states
 u_all_ends = [sol.all_ys[-1][:,-1] for sol in solution]
 up_all_ends = [sol.all_yps[-1][:,-1] for sol in solution]
-u_propagator = [u[0] for u in solution_propagator]
-up_propagator = [up[1] for up in solution_propagator]
+u_propagator = [u[:state_size] for u in solution_propagator]
+up_propagator = [up[state_size:] for up in solution_propagator]
 
 diff_u_ends = [np.linalg.norm(u1-u2, ord=np.inf) for u1,u2 in zip(u_all_ends,u_propagator[1:])]
 diff_up_ends = [np.linalg.norm(u1-u2, ord=np.inf) for u1,u2 in zip(up_all_ends,up_propagator[1:])]
