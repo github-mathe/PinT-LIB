@@ -61,7 +61,11 @@ class PybammPropagator(Propagator):
     
     @property
     def u_full(self):
-        return np.vstack((self._u_start, self._up_start))
+        return np.concatenate((self._u_start, self._up_start))
+    
+    @property
+    def state_size(self):
+        return self._state_size
     
     def _compute_one_step(self):
         # compute the strating solution
@@ -113,10 +117,10 @@ class PybammPropagator(Propagator):
     def make_starting_solution(self, u):
         dummy_solution = pybamm.Solution(
             all_ts=np.array([0.0]), 
-            all_ys=np.array(u[0].reshape(self._initial_solution.y.shape),copy=True),
+            all_ys=np.array(u[:self._state_size].reshape(self._initial_solution.y.shape),copy=True),
             all_models = self._last_step_model,
             all_inputs = self.inputs,
-            all_yps=np.array(u[1].reshape(self._initial_solution.yp.shape),copy=True),
+            all_yps=np.array(u[self._state_size:].reshape(self._initial_solution.yp.shape),copy=True),
             t_event=None,
             y_event=None,
             options={'compile': False},
@@ -160,11 +164,14 @@ class PybammPropagator(Propagator):
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
-        U = np.vstack((u_next, up_next))#, dtype=np.longdouble)
+        U = np.concatenate((u_next, up_next))#, dtype=np.longdouble)
         if self.eps_time:
             t_next = t_next + self.eps_time
         if self.eps_state:
-            U[0][122:] = np.add(U[0][122:], self.eps_state*np.ones_like(U[0][122:]))#, dtype=np.longdouble)
+            len_rhs = self._last_step_model.len_rhs
+            
+            U[:self._state_size][:len_rhs] = np.add(U[0][:len_rhs], self.eps_state*np.ones_like(U[0][:len_rhs]))
+            U[:self._state_size][len_rhs:] = np.add(U[0][len_rhs:], self.eps_state*1e-3*np.ones_like(U[0][len_rhs:]))
         return t_next, U
     
     def solve(self, t, u, cycle):
@@ -183,4 +190,4 @@ class PybammPropagator(Propagator):
         t_next = t + t_next_local
         if self.eps_time & self.eps_state:
             return t_next+self.eps_time, np.vstack((u_next, up_next))+self.eps_state, cycle_solution
-        return t_next, np.vstack((u_next, up_next)), cycle_solution
+        return t_next, np.concatenate((u_next, up_next)), cycle_solution
