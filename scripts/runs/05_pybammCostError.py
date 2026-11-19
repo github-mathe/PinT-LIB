@@ -27,11 +27,6 @@ num_cycles = 4
 rtolCoarse = 1/(10**np.arange(2,7))
 rtolFine = 1e-6 # default
 
-#atolCoarse = 1e-6
-#atolFine = 1e-6
-#atolCoarse = 1e-6
-#atolFine = 1e-6 # default
-
 solutionFine = np.empty(num_cycles+1, dtype=object)
 solutionCoarse = np.empty((len(rtolCoarse), num_cycles+1),dtype=object)
 
@@ -44,6 +39,7 @@ fine_propagator = PybammPropagator(
 uStart = copy.deepcopy(fine_propagator.u_full)
 solutionFine[0] = uStart
 len_rhs = fine_propagator._last_step_model.len_rhs
+state_size = fine_propagator._state_size
 
 coarse_propagators = [
     PybammPropagator(
@@ -89,9 +85,9 @@ for cycle in range(num_cycles):
     
     for i, rtolC in enumerate(rtolCoarse):
         err_t[i, 0] = np.abs(tFine_cycles[0]-tCoarse_cycles[i,0])
-        err_u[i, 0] = np.linalg.norm(solutionFine[0][0] - solutionCoarse[i,0][0], ord=np.inf)
-        err_u_diff[i, 0] =  np.linalg.norm(solutionFine[0][0][:len_rhs] - solutionCoarse[i,0][0][:len_rhs], ord=np.inf)
-        err_up[i, 0] = np.linalg.norm(solutionFine[0][1] - solutionCoarse[i,0][1], ord=np.inf)
+        err_u[i, 0] = np.linalg.norm(solutionFine[0][:state_size] - solutionCoarse[i,0][:state_size], ord=np.inf)
+        err_u_diff[i, 0] =  np.linalg.norm(solutionFine[0][:state_size][:len_rhs] - solutionCoarse[i,0][:state_size][:len_rhs], ord=np.inf)
+        err_up[i, 0] = np.linalg.norm(solutionFine[0][state_size:] - solutionCoarse[i,0][state_size:], ord=np.inf)
 
         # coarse propagator
         time_start_coarse = time.perf_counter()
@@ -105,9 +101,9 @@ for cycle in range(num_cycles):
         tCoarse_cycles[i,cycle+1] = tCoarse
         solutionCoarse[i,cycle+1] = solCoarse
         err_t[i, cycle+1] = np.abs(tFine-tCoarse)
-        err_u[i, cycle+1] = np.linalg.norm(solFine[0] - solCoarse[0], ord=np.inf)
-        err_u_diff[i, cycle+1] = np.linalg.norm(solFine[0][:len_rhs] - solCoarse[0][:len_rhs], ord=np.inf)
-        err_up[i, cycle+1] = np.linalg.norm(solFine[1] - solCoarse[1], ord=np.inf)
+        err_u[i, cycle+1] = np.linalg.norm(solFine[:state_size] - solCoarse[:state_size], ord=np.inf)
+        err_u_diff[i, cycle+1] = np.linalg.norm(solFine[:state_size][:len_rhs] - solCoarse[:state_size][:len_rhs], ord=np.inf)
+        err_up[i, cycle+1] = np.linalg.norm(solFine[state_size:] - solCoarse[state_size:], ord=np.inf)
 
 #%%
 
