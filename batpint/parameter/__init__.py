@@ -1,3 +1,1 @@
-"""
-TODO : documentation
-"""
+"""Battery parameter sets."""

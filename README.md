@@ -15,19 +15,36 @@ For each cell type, the following test protocols are implemented:
 ## Directory Structure
 
 ```
-batpint/            # Python library for parameters and base code
-└── parameter/
-    └── javid/
-        │---Li_full.py
-        │---Li_half.py
-scripts/            # Test case implementations
-└── notebooks/
-    │---cccv_half_cell.ipynb
-    │---gitt_half_cell.ipynb
-    │---cccv_full_cell.ipynb
-    │---gitt_full_cell.ipynb
-└── runs
-    │---01_baseCase.py  # script to simulate every cases in the notebooks
+batpint/                        # Python library for parameters and base code
+├── parameter/
+│   └── javid/
+│       ├── common.py           # shared functions and base parameters
+│       ├── Li_full.py          # full-cell parameter set
+│       ├── Li_half.py          # half-cell parameter set
+│       └── OCV/                # open-circuit voltage data (CSV)
+├── problems/                   # problem definitions (base IVP, Dahlquist, battery)
+├── time_integration/           # integration methods (Backward Euler, Newton)
+├── timestepping/               # event-driven time-stepper
+├── parareal/                   # Parareal solver, propagators, errors, plots
+└── plotting.py                 # matplotlib style configuration
+scripts/
+├── notebooks/
+│   ├── cccv_half_cell.ipynb
+│   ├── gitt_half_cell.ipynb
+│   ├── cccv_full_cell.ipynb
+│   ├── gitt_full_cell.ipynb
+│   └── dahlquist.ipynb
+└── runs/
+    ├── 01_baseCase.py              # simulate base cases from the notebooks
+    ├── 02_varParareal.py           # Parareal on the Dahlquist problem
+    ├── 03_cycleInterfaceComparison.py  # compare cycle interface states
+    ├── 04_pybammPropagator.py      # PyBaMM propagator validation
+    ├── 05_pybammCostError.py       # coarse/fine cost vs error
+    ├── 06_pybammDahlquist.py       # PyBaMM-based Dahlquist + Parareal
+    ├── 06_pybammParareal.py        # Parareal on PyBaMM battery model
+    └── 07_pybammEvents.py          # event sensitivity to perturbations
+tests/                          # pytest test suite
+docs/                           # meeting notes and changelogs
 ```
 
 ## Installation

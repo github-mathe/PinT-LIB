@@ -1,12 +1,15 @@
 # %%
-import numpy as np
-import matplotlib.pyplot as plt
 import time
-from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact, solve_dahlquist_cycles
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 from batpint.parareal.parareal import PararealModified
+from batpint.parareal.timestepper_propagator import TimeStepperPropagator
+from batpint.problems.dahlquist import Dahlquist, DahlquistBE, DahlquistExact, solve_dahlquist_cycles
+
 #from batpint.parareal.propagation_state import PropagationState
 from batpint.timestepping.timestepper import TimeStepper
-from batpint.parareal.timestepper_propagator import TimeStepperPropagator
 
 # Dahlquist test problem parameters
 t_start = 0
@@ -41,7 +44,7 @@ methodEx = DahlquistExact()
 # teTh and ueTh are the event times and values for the analytical solution
 
 num_cycles = 5 # number of cycles
-try:    
+try:
     tNum, uNum, teNum, ueNum = solve_dahlquist_cycles(problem=problem, method=methodNum, dt=dtNum, num_cycles=num_cycles, terminate_cycle = terminate, save_history=True)
     tTh, uTh, teTh, ueTh = solve_dahlquist_cycles(problem=problem, method=methodEx, dt=dtEx, num_cycles=num_cycles, terminate_cycle = terminate, save_history=True)
 
@@ -49,7 +52,7 @@ try:
     plt.plot(uNum.real, uNum.imag, label="Numerical")
     plt.plot(uTh.real, uTh.imag, "--", label="Analytical")
     plt.plot(ueNum.real, ueNum.imag, 'o', label=r"$u_{\mathrm{ev}}$ (Numerical)")
-    plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid();
+    plt.legend(loc="lower left"), plt.xlabel(r"$\Re(u)$"), plt.ylabel(r"$\Im(u)$"), plt.grid()
 except Exception as e:
     print(f"An error occurred during the simulation: {e}")
 
@@ -165,7 +168,7 @@ plt.semilogy(range(K+1), err_tePararealmax, label=r'$\|te_{Parareal} - te_{FineN
 plt.axhline(y=err_teFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(K+1))
 plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
+plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid()
 plt.legend()
 
 plt.subplot(1,2, 2)
@@ -173,9 +176,9 @@ plt.semilogy(range(K+1), err_uePararealmax, label=r'$\|ue_{Parareal} - ue_{FineN
 plt.axhline(y=err_ueFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(K+1))
 plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid();
-plt.legend()  
-plt.tight_layout()  
+plt.xlabel("Parareal iteration k"), plt.ylabel("Error"), plt.grid()
+plt.legend()
+plt.tight_layout()
 
 
 #%%
@@ -188,8 +191,8 @@ for k in range(K+1):
 plt.axhline(y=err_teFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
-plt.legend()  
+plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid()
+plt.legend()
 
 
 plt.subplot(1,2, 2)
@@ -198,8 +201,8 @@ for k in range(K+1):
 plt.axhline(y=err_ueFine, color='red', linestyle='--', label="Fine solver error")
 plt.xticks(range(N+1))
 plt.yscale('symlog', linthresh=1e-14)
-plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid();
-plt.legend()  
+plt.xlabel("Cycles"), plt.ylabel("Error"), plt.grid()
+plt.legend()
 
 plt.tight_layout()
 plt.show()

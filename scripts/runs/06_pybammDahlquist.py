@@ -8,36 +8,38 @@ Created on Fri Oct 30 12:17:01 2026
 
 # check sundials solvers on ODE for parareal
 
-import pybamm
-import numpy as np
 import matplotlib.pyplot as plt
-from batpint.problems.dahlquist import Dahlquist
-from batpint.parareal.base_propagator import Propagator    
-from batpint.parareal.parareal import PararealModified
+import numpy as np
+import pybamm
+
+from batpint.parareal.base_propagator import Propagator
 from batpint.parareal.errors import compute_parareal_errors
-from batpint.parareal.plot import plot_error_per_iteration, plot_error_per_cycle
+from batpint.parareal.parareal import PararealModified
+from batpint.parareal.plot import plot_error_per_cycle, plot_error_per_iteration
+from batpint.problems.dahlquist import Dahlquist
+
 
 #%%
 # construct pybamm Dahlquist model
 def pybammDahlquist(uStart, lam, alpha):
     model = pybamm.BaseModel()
-    
+
     # variables
     uIm = pybamm.Variable("uIm")
     uRe = pybamm.Variable("uRe")
-    
+
     # parameters
     cycle = pybamm.InputParameter("cycle")
     lam = pybamm.FunctionParameter(name="lambda", inputs={"cycle":cycle})
     alpha = pybamm.Parameter("alpha")
     t = pybamm.t
-    
+
     # equations
     model.rhs = {uIm: lam * uRe, uRe: -uIm*lam + pybamm.sin(alpha*t) } #λu + sin(αt)
     model.variables = {"uIm": uIm, "uRe": uRe}
     model.initial_conditions = {uIm: np.imag(uStart), uRe: np.real(uStart)}
     t_gate = pybamm.InputParameter("t_gate")
-    
+
     model.events.append(
         pybamm.Event(
             "Second zero crossing",
@@ -63,36 +65,36 @@ class MyPropagator(Propagator):
         self.model = model
         self.solver = solver
         self.inputs = {} if inputs is None else dict(inputs)
-    
+
     def propagate(self, t, u, cycle):
 
         starting_solution = pybamm.Solution(
-            all_ts=np.array([t], copy=True), 
+            all_ts=np.array([t], copy=True),
             all_ys=np.array(u,copy=True),
             all_models = [self.model],
             all_inputs = [{"cycle": cycle-1, "t_gate": .5}],
             t_event=None,
             y_event=None,
             all_t_evals=None)
-        self.model.set_initial_conditions_from(starting_solution, inplace=True) 
+        self.model.set_initial_conditions_from(starting_solution, inplace=True)
         solution = self.solver.solve(
              self.model,
              t_eval=np.linspace(t, t+100),
              inputs={"cycle": cycle, "t_gate": t + 3.5,
                      })
         return solution.t_event[-1], solution.y_event
-    
+
     def solve(self, t, u, cycle):
-        
+
         starting_solution = pybamm.Solution(
-                all_ts=np.array([t], copy=True), 
+                all_ts=np.array([t], copy=True),
                 all_ys=np.array(u,copy=True),
                 all_models = [self.model],
                 all_inputs = [{"cycle": 0, "t_gate": .5}],
                 t_event=None,
                 y_event=None,
                 all_t_evals=None)
-        self.model.set_initial_conditions_from(starting_solution, inplace=True) 
+        self.model.set_initial_conditions_from(starting_solution, inplace=True)
         solution = self.solver.solve(
              self.model,
              t_eval=np.linspace(t, t+100),
@@ -138,15 +140,15 @@ fig,ax = plt.subplots()
 for cycle in range(num_cycles):
     tEv, uEv, solution = propagator.solve(t, u, cycle)
     t=tEv.copy()
-    u=uEv.copy()        
-    ax.plot(tTh, np.imag(uTh), 'g-',label="$\Im(u)$ exact" if cycle==0 else "")
-    ax.plot(solution.t, solution.y[0,:], 'go', label="$\Im(u)$ PyBaMM" if cycle==0 else "", markersize=3)
-    
+    u=uEv.copy()
+    ax.plot(tTh, np.imag(uTh), 'g-',label=r"$\Im(u)$ exact" if cycle==0 else "")
+    ax.plot(solution.t, solution.y[0,:], 'go', label=r"$\Im(u)$ PyBaMM" if cycle==0 else "", markersize=3)
+
     ax1 = ax.twinx()
-    ax1.plot(tTh, np.real(uTh), 'r-', label="$\Re(u)$ exact" if cycle==0 else "")
-    ax1.plot(solution.t, solution.y[1,:], 'ro', label="$\Re(u)$ PyBaMM" if cycle==0 else "", markersize=3)
-   
-ax.set_xlabel("t"), ax.set_ylabel(r"$\Im(u)$"), ax.grid();
+    ax1.plot(tTh, np.real(uTh), 'r-', label=r"$\Re(u)$ exact" if cycle==0 else "")
+    ax1.plot(solution.t, solution.y[1,:], 'ro', label=r"$\Re(u)$ PyBaMM" if cycle==0 else "", markersize=3)
+
+ax.set_xlabel("t"), ax.set_ylabel(r"$\Im(u)$"), ax.grid()
 ax1.set_ylabel(r"$\Re(u)$")
 fig.legend(loc="upper center", ncol=2)
 
@@ -172,7 +174,7 @@ for cycle in range(N):
     tFine, solFine = fine_propagator.propagate(
         t=tFine_cycles[cycle],
         u=solutionFine[cycle],
-        cycle=cycle)    
+        cycle=cycle)
     tFine_cycles[cycle+1] = tFine
     solutionFine[cycle+1] = solFine
     uFine_cycles[cycle+1] = solFine[0][0]*1j + solFine[1][0]
@@ -198,11 +200,11 @@ errU = compute_parareal_errors(U_complex, uFine_cycles)
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT[:,-1], errU[:,-1], K=K, N=N)
 ax_left.legend(labels=["time error"], loc="upper right")
-ax_right.legend(labels=["state error"], loc="upper right") 
+ax_right.legend(labels=["state error"], loc="upper right")
 
 # plot the errors per cycle
 fig, (ax_left, ax_right) = plt.subplots(1,2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_cycle(ax_left, ax_right, errTT, errU, K=K, N=N)
 fig.legend(handles=ax_left.lines, loc="upper center", ncol=K+1)
-plt.tight_layout()  
+plt.tight_layout()
 plt.show()

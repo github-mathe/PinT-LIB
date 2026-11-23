@@ -1,5 +1,7 @@
 import numpy as np
+
 from batpint.time_integration.base_method import AlgebraicSolver
+
 
 class Newton(AlgebraicSolver):
     """
@@ -43,4 +45,3 @@ class Newton(AlgebraicSolver):
                 delta_x = np.linalg.solve(J, -r)
             x = x + delta_x
         raise RuntimeError("Newton method did not converge.")
-        

@@ -1,6 +1,5 @@
 """Error measures for Parareal solutions."""
 
-from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -29,6 +28,7 @@ def _error(
         return 0.0 if absolute_error == 0 else np.inf
     return absolute_error / reference_norm
 
+
 def compute_parareal_errors(
     U: np.ndarray,
     u_exact: np.ndarray,
@@ -40,7 +40,7 @@ def compute_parareal_errors(
 
     Parameters
     ----------
-    
+
     U : numpy.ndarray
         Object array of Parareal solutions with shape ``(K + 1, N + 1)``.
         Each entry can be one NumPy array, a tuple/list of component arrays, or
@@ -61,16 +61,14 @@ def compute_parareal_errors(
         containing one error per component. For an array state, components are
         taken along its first axis.
     """
-    U = np.asarray(U, dtype=object)  
+    U = np.asarray(U, dtype=object)
     u_exact = np.asarray(u_exact, dtype=object)
-    
+
     if u_exact.shape != (U.shape[1],):
         raise ValueError("u_exact must have one entry per cycle.")
 
     solution_errors = np.empty(U.shape, dtype=object)
     for iteration, cycle in np.ndindex(U.shape):
-        solution_errors[iteration, cycle] = _error(
-            U[iteration, cycle], u_exact[cycle], ord, relative
-        )
+        solution_errors[iteration, cycle] = _error(U[iteration, cycle], u_exact[cycle], ord, relative)
 
     return solution_errors

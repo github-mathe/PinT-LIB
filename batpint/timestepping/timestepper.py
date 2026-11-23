@@ -1,5 +1,5 @@
-import numpy as np
 import copy
+
 
 class TimeStepper:
     """
@@ -21,7 +21,7 @@ class TimeStepper:
     save_history : bool, optional
         If True, store the history of time and state.
     """
-    
+
     def __init__(self, problem, method, dt, event_tol=1e-6, save_history=False):
         self.problem = problem
         self.method = method
@@ -56,7 +56,7 @@ class TimeStepper:
     def rhs(self, t, u):
         kwargs = self._resolve_params(self.problem.rhs_params)
         return self.problem.rhs(t, u, **kwargs)
-    
+
     def jacobian(self, t, u):
         if self.problem.jacobian is None:
             return None
@@ -72,13 +72,15 @@ class TimeStepper:
             return False
         kwargs = self._resolve_params(self.problem.terminate_step_params)
         return self.problem.terminate_step(t, u, **kwargs)
-    
+
     def step(self, h=None):
         if h is None:
             h = self.dt
         jacobian = self.jacobian if self.problem.jacobian else None
         method_kwargs = self._resolve_params(self.method.step_params)
-        self.state.u = self.method.step(rhs=self.rhs, t=self.state.t, u=self.state.u, h=h, jacobian=jacobian, **method_kwargs)
+        self.state.u = self.method.step(
+            rhs=self.rhs, t=self.state.t, u=self.state.u, h=h, jacobian=jacobian, **method_kwargs
+        )
         self.state.t += h
 
         if self.save_history:
@@ -86,12 +88,9 @@ class TimeStepper:
             self.history["u"].append(copy.deepcopy(self.state.u))
 
         if self.terminate_step(self.state.t, self.state.u):
-            raise RuntimeError(
-                f"STEP_TERMINATION: cycle={self.state.cycle}, "
-                f"t={self.state.t}, u={self.state.u}"
-            )
+            raise RuntimeError(f"STEP_TERMINATION: cycle={self.state.cycle}, t={self.state.t}, u={self.state.u}")
         return self.state
-    
+
     def advance_to_time(self, t_end):
         """
         Advance the solution to a specified end time.
@@ -111,7 +110,7 @@ class TimeStepper:
         elif direction > 0:
             return g_old < 0 and g_new >= 0  # Crossing from negative to positive
         else:
-            return g_old > 0 and g_new <= 0  # Crossing from positive to negative   
+            return g_old > 0 and g_new <= 0  # Crossing from positive to negative
 
     @staticmethod
     def _interpolate_event(t_old, u_old, t_new, u_new, g_old, g_new):
@@ -121,7 +120,7 @@ class TimeStepper:
         u_event = u_old + theta * (u_new - u_old)
 
         return t_event, u_event
-            
+
     def advance_to_event(self, direction=0):
         """
         Advance the solution until the next admissible event crossing.

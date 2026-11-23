@@ -1,5 +1,5 @@
 import inspect
-import numpy as np
+
 
 class Problem:
     """
@@ -11,7 +11,7 @@ class Problem:
         (t, u,...)
     Additional keyword arguments passed at construction are stored
     as fixed problem parameters "params".
-    
+
     Parameters
     ----------
     t_start : float
@@ -48,12 +48,12 @@ class Problem:
 
     @staticmethod
     def _get_params(func):
-        
+
         if func is None:
             return ()
-        
+
         names = tuple(inspect.signature(func).parameters)
-        
+
         if names[:2] != ("t", "u"):
             raise ValueError("Problem functions must start with arguments (t, u).")
 
