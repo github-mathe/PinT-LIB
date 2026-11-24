@@ -98,8 +98,20 @@ def test_parareal_modified_basic():
     TT, U = parareal.solve(t0=0.0, u0=np.array([0.0]), K=K, N=N)
 
     assert TT.shape == (K + 1, N + 1)
-    assert U.shape == (K + 1, N + 1)
+    assert U.shape == (K + 1, N + 1, 1)
+    assert np.allclose(U[0, :, 0], [0.0, 1.5, 3.0, 4.5])
+    assert np.allclose(U[:, 0, 0], 0.0)
     # First row: coarse propagation -> t = 0,1,2,3
     assert np.allclose(TT[0, :], [0, 1, 2, 3])
     # All rows should have t[*,0] = 0
     assert np.allclose(TT[:, 0], 0.0)
+
+
+def test_parareal_integer_initial_state_preserves_fractional_values():
+    propagator = _MockPropagator(offset=0.5)
+    parareal = PararealModified(fine=propagator, coarse=propagator, coarse_s=propagator)
+
+    _, U = parareal.solve(t0=0.0, u0=np.array([0], dtype=int), K=0, N=1)
+
+    assert np.issubdtype(U.dtype, np.floating)
+    assert U[0, 1, 0] == pytest.approx(1.5)
