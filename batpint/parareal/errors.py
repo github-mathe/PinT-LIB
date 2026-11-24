@@ -67,7 +67,7 @@ def compute_parareal_errors(
     if u_exact.shape != (U.shape[1:]):
         raise ValueError("u_exact must have one entry per cycle.")
 
-    solution_errors = np.empty(U.shape, dtype=np.float64)
+    solution_errors = np.empty(U.shape[:2], dtype=np.float64)
     for iteration, cycle in np.ndindex(U.shape[0:2]):
         solution_errors[iteration, cycle] = _error(U[iteration, cycle], u_exact[cycle], ord, relative)
 
