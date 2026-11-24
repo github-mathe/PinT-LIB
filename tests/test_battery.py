@@ -1,5 +1,6 @@
 """Tests for battery experiment creation, factory functions, and parameter structure."""
 
+import numpy as np
 import pybamm
 import pytest
 
@@ -63,12 +64,12 @@ def test_battery_experiment_invalid_type():
 # --- Factory functions ---
 
 
-def test_make_dfm_model_half_cell():
+def test_make_dfn_model_half_cell():
     model = make_dfn_model(half_cell=True)
     assert isinstance(model, pybamm.lithium_ion.DFN)
 
 
-def test_make_dfm_model_full_cell():
+def test_make_dfn_model_full_cell():
     model = make_dfn_model(half_cell=False)
     assert isinstance(model, pybamm.lithium_ion.DFN)
 
@@ -89,10 +90,22 @@ def test_default_var_pts():
 
 
 def test_make_propagator_constructs():
-    """make_propagator should return a PybammPropagator with valid initial state."""
+    """The battery propagator should construct and propagate consecutive cycles."""
     from batpint.problems.battery import make_propagator
 
     prop = make_propagator(half_cell=True, exp="CCCV", nCycles=1, rtol=1e-4)
-    assert prop.u_start is not None
-    assert prop.u_full.shape[0] == 2  # stacked u and up
     assert prop.t_start == 0.0
+    assert prop.u_start.shape == prop.up_start.shape
+    assert prop.u_full.shape == (prop.u_start.size, 2)
+    np.testing.assert_allclose(prop.u_full[:, 0], prop.u_start)
+    np.testing.assert_allclose(prop.u_full[:, 1], prop.up_start)
+
+    t_next, u_next = prop.propagate(prop.t_start, prop.u_full.copy(), cycle=0)
+    assert t_next > prop.t_start
+    assert u_next.shape == prop.u_full.shape
+    assert np.isfinite(u_next).all()
+
+    t_after, u_after = prop.propagate(t_next, u_next, cycle=1)
+    assert t_after > t_next
+    assert u_after.shape == prop.u_full.shape
+    assert np.isfinite(u_after).all()
