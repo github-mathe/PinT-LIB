@@ -7,19 +7,20 @@ from batpint.problems.battery import batteryExperiment, make_dfn_model, make_par
 
 # Script parameters
 half_cell = True
-exp = "CCCV" # GITT or CCCV
+exp = "CCCV"  # GITT or CCCV
 nCycles = 1
-num_cycles = 50
+num_cycles = 30
+rtol = 1e-6  # use the same relative tolerance for both calculations
 
 # Space discretization
 var_pts = {
-    "x_n": 1,   # points in the negative electrode
+    "x_n": 1,  # points in the negative electrode
     "x_s": 10,  # points in the separator
     "x_p": 10,  # points in the positive electrode
-    "r_p": 30  # points in the radius of positive electrode
+    "r_p": 10,  # points in the radius of positive electrode
 }
 
-#%%
+# %%
 # Run script
 def make_simulation():
     """Create an independent DFN simulation."""
@@ -28,7 +29,7 @@ def make_simulation():
         experiment=batteryExperiment(nCycles, expType=exp),
         parameter_values=make_parameter_values(half_cell),
         var_pts=var_pts,
-        solver=pybamm.IDAKLUSolver(),
+        solver=pybamm.IDAKLUSolver(rtol=rtol),
     )
 
 sim = make_simulation()
@@ -41,7 +42,7 @@ init_sol = None
 
 # store cycle solutions
 solution = []
-solution_propagator=[]
+solution_propagator = []
 # store global times per cycle
 t_all = []
 t_propagator = [0]
@@ -49,22 +50,17 @@ t_propagator = [0]
 t_delta = 0.0
 
 # %%
-
-pybamm_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts)
+pybamm_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtol)
 uStart = pybamm_propagator.u_full
 solution_propagator.append(uStart)
-state_size =  pybamm_propagator.state_size
+state_size = uStart.shape[0]
 # compute
 for cycle in range(num_cycles):
-
     tNext, sol_propagator = pybamm_propagator.propagate(
-        t = t_propagator[cycle],
-        u = solution_propagator[cycle],
-        cycle = cycle)
+        t=t_propagator[cycle], u=solution_propagator[cycle], cycle=cycle
+    )
     t_propagator.append(tNext)
     solution_propagator.append(sol_propagator)
-
-
     sol = sim.solve(starting_solution=init_sol)
     cycle_sol = sol.cycles[-1]
     solution.append(cycle_sol)
@@ -77,29 +73,28 @@ for cycle in range(num_cycles):
     # with times 0 and states from the last state of the present solution cycle
     init_sol = pybamm.Solution(
         all_ts=np.array([0.0]),
-        all_ys=np.array(sol_end.all_ys[-1],copy=True),
+        all_ys=np.array(sol_end.all_ys[-1], copy=True),
         all_models=sol_end.all_models[-1],
         all_inputs=sol_end.all_inputs[-1],
-        all_yps=np.array(sol_end.all_yps[-1],copy=True) if sol_end.all_yps is not None else None,
+        all_yps=np.array(sol_end.all_yps[-1], copy=True) if sol_end.all_yps is not None else None,
         t_event=None,
         y_event=None,
         options=sol_end.user_options,
-        all_t_evals=None)
+        all_t_evals=None,
+    )
 
-#%%
+# %%
 # check cycle end times
 t_all_ends = [t[-1] for t in t_all]
-diff_t_ends = [t1-t2 for t1,t2 in zip(t_all_ends, t_propagator[1:])]
-not_zero_t = np.nonzero(diff_t_ends)
-print("Difference in end times of cycles: ", not_zero_t)
-#check end states
-u_all_ends = [sol.all_ys[-1][:,-1] for sol in solution]
-up_all_ends = [sol.all_yps[-1][:,-1] for sol in solution]
-u_propagator = [u[:state_size] for u in solution_propagator]
-up_propagator = [up[state_size:] for up in solution_propagator]
+diff_t_ends = [t1 - t2 for t1, t2 in zip(t_all_ends, t_propagator[1:])]
+print("Difference in end times of cycles: ", np.asarray(diff_t_ends))
+# check end states
+u_all_ends = [sol.all_ys[-1][:, -1] for sol in solution]
+up_all_ends = [sol.all_yps[-1][:, -1] for sol in solution]
+u_propagator = [u[:,0] for u in solution_propagator]
+up_propagator = [up[:,1] for up in solution_propagator]
 
-diff_u_ends = [np.linalg.norm(u1-u2, ord=np.inf) for u1,u2 in zip(u_all_ends,u_propagator[1:])]
-diff_up_ends = [np.linalg.norm(u1-u2, ord=np.inf) for u1,u2 in zip(up_all_ends,up_propagator[1:])]
-not_zero_u = np.nonzero(diff_u_ends)
-not_zero_up = np.nonzero(diff_up_ends)
-print("Difference in end states, derivatives of states: ", not_zero_u, not_zero_up)
+diff_u_ends = [np.linalg.norm(u1 - u2, ord=np.inf) for u1, u2 in zip(u_all_ends, u_propagator[1:])]
+diff_up_ends = [np.linalg.norm(u1 - u2, ord=np.inf) for u1, u2 in zip(up_all_ends, up_propagator[1:])]
+print("Maximum absolute difference in end states per cycle: ", np.asarray(diff_u_ends))
+print("Maximum absolute difference in end-state derivatives per cycle: ", np.asarray(diff_up_ends))
