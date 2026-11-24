@@ -22,7 +22,7 @@ def make_parameter_values(half_cell=True):
     return pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
 
 
-def make_propagator(half_cell=True, exp="CCCV", nCycles=1, var_pts=None, rtol=1e-6, eps_time=None, eps_state=None):
+def make_propagator(half_cell=True, exp="CCCV", nCycles=1, var_pts=None, rtol=1e-6, solver_options = {}, eps_time=None, eps_state=None):
     """Create a PybammPropagator with the standard battery setup.
 
     Parameters
@@ -47,7 +47,7 @@ def make_propagator(half_cell=True, exp="CCCV", nCycles=1, var_pts=None, rtol=1e
         experiment=batteryExperiment(nCycles, expType=exp),
         parameter_values=make_parameter_values(half_cell),
         var_pts=var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtol),
+        solver=pybamm.IDAKLUSolver(rtol=rtol, options=solver_options),
         eps_time=eps_time,
         eps_state=eps_state,
     )
