@@ -157,8 +157,8 @@ class PybammPropagator(Propagator):
         if self.eps_state:
             len_rhs = self._last_step_model.len_rhs  # length of differential states
 
-            U[:, 0][:len_rhs] += self.eps_state * np.ones(len_rhs)
-            U[:, 0][len_rhs:] += self.eps_state * 1e-3 * np.ones(self._state_size - len_rhs)
+            U[:len_rhs, 0] += self.eps_state * np.ones(len_rhs)
+            U[len_rhs:, 0] += self.eps_state * 1e-3 * np.ones(self._state_size - len_rhs)
         return t_next, U
 
     def solve(self, t, u, cycle):
