@@ -36,9 +36,8 @@ class PybammPropagator(Propagator):
         self._state_size = self._last_step_model.len_rhs_and_alg
 
         self._initial_solution = self._compute_one_step()
-        self._t_start, self._u_start, self._up_start = \
-            self.extract_state(self._initial_solution)
-
+        self._t_start, self._u_start, self._up_start = self.extract_state(self._initial_solution)
+        self._u_full_start = np.column_stack((self._u_start, self._up_start))
         self.eps_time = eps_time
         self.eps_state = eps_state
 
@@ -56,7 +55,7 @@ class PybammPropagator(Propagator):
 
     @property
     def u_full(self):
-        return np.vstack((self._u_start, self._up_start))
+        return self._u_full_start
 
     def _compute_one_step(self):
         # compute the strating solution
@@ -105,10 +104,10 @@ class PybammPropagator(Propagator):
     def make_starting_solution(self, u):
         dummy_solution = pybamm.Solution(
             all_ts=np.array([0.0]),
-            all_ys=np.array(u[0].reshape(self._initial_solution.y.shape), copy=True),
+            all_ys=np.array(u[:, 0].reshape(self._initial_solution.y.shape), copy=True),
             all_models=self._last_step_model,
             all_inputs=self.inputs,
-            all_yps=np.array(u[1].reshape(self._initial_solution.yp.shape), copy=True),
+            all_yps=np.array(u[:, 1].reshape(self._initial_solution.yp.shape), copy=True),
             t_event=None,
             y_event=None,
             options={"compile": False},
@@ -152,30 +151,27 @@ class PybammPropagator(Propagator):
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
-        U = np.concatenate((u_next, up_next))#, dtype=np.longdouble)
+        U = np.column_stack((u_next, up_next))
         if self.eps_time:
             t_next = t_next + self.eps_time
         if self.eps_state:
-            len_rhs = self._last_step_model.len_rhs
-            
-            U[:self._state_size][:len_rhs] = np.add(U[0][:len_rhs], self.eps_state*np.ones_like(U[0][:len_rhs]))
-            U[:self._state_size][len_rhs:] = np.add(U[0][len_rhs:], self.eps_state*1e-3*np.ones_like(U[0][len_rhs:]))
+            len_rhs = self._last_step_model.len_rhs  # length of differential states
+
+            U[:, 0][:len_rhs] += self.eps_state * np.ones(len_rhs)
+            U[:, 0][len_rhs:] += self.eps_state * 1e-3 * np.ones(self._state_size - len_rhs)
         return t_next, U
-    
+
     def solve(self, t, u, cycle):
-        
+
         if cycle == 0:
             starting_solution = None
         else:
             starting_solution = self.make_starting_solution(u)
-        
-        solution = self.sim.solve(
-            starting_solution=starting_solution,
-            inputs=self.inputs
-        )
+
+        solution = self.sim.solve(starting_solution=starting_solution, inputs=self.inputs)
         cycle_solution = solution.cycles[-1]
         t_next_local, u_next, up_next = self.extract_state(cycle_solution)
         t_next = t + t_next_local
         if self.eps_time & self.eps_state:
-            return t_next+self.eps_time, np.vstack((u_next, up_next))+self.eps_state, cycle_solution
-        return t_next, np.concatenate((u_next, up_next)), cycle_solution
+            return t_next + self.eps_time, np.vstack((u_next, up_next)) + self.eps_state, cycle_solution
+        return t_next, np.column_stack((u_next, up_next)), cycle_solution
