@@ -90,7 +90,7 @@ def test_default_var_pts():
 
 
 def test_make_propagator_constructs():
-    """The battery propagator should construct and propagate consecutive cycles."""
+    """make_propagator should return a PybammPropagator with valid initial state."""
     from batpint.problems.battery import make_propagator
 
     prop = make_propagator(half_cell=True, exp="CCCV", nCycles=1, rtol=1e-4)
