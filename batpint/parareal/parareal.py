@@ -1,5 +1,3 @@
-import copy
-
 import numpy as np
 
 
@@ -46,14 +44,16 @@ class PararealModified:
         U : np.empty
             Array of shape (K+1, N+1) containing the solution values for each iteration and window.
         """
+        u0 = np.asarray(u0)
+        t0 = np.asarray(t0)
+
         print("Initializing Parareal solver...")
-        TT = np.zeros((K + 1, N + 1), dtype=float)
+        TT = np.zeros((K + 1, N + 1, *t0.shape), dtype=float)
         TT[:, 0] = t0
 
-        U = np.empty((K + 1, N + 1), dtype=object)
+        U = np.empty((K + 1, N + 1, *u0.shape), dtype=np.result_type(u0.dtype, np.float64))
 
-        for k in range(K + 1):
-            U[k, 0] = copy.deepcopy(u0)
+        U[:, 0] = u0
 
         print("Initialization completed.")
 
@@ -66,7 +66,7 @@ class PararealModified:
             if self.first_guess == "fine":
                 TPG, UPG = self.fine.propagate(TT[0, n], U[0, n], cycle=n)
             TT[0, n + 1] = TPG
-            U[0, n + 1] = copy.deepcopy(UPG)
+            U[0, n + 1] = UPG
 
         print("First coarse propagation completed.")
         print("Starting Parareal iterations...")
@@ -79,7 +79,8 @@ class PararealModified:
                 TPG_s, UPG_s = self.coarse_s.propagate(TT[k + 1, n], U[k + 1, n], cycle=n)
 
                 TT[k + 1, n + 1] = TPF + (TPG_s - TPG)
-                U[k + 1, n + 1] = np.sum([UPF, UPG_s, -UPG], axis=0, dtype=np.double)
+                U[k + 1, n + 1] = UPF + (UPG_s - UPG)
 
         print("Parareal iterations completed.")
+
         return TT, U
