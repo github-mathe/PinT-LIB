@@ -52,21 +52,15 @@ state_size = uStart.shape[0]
 
 # exact numerical solution
 UFine = np.empty((N + 1, *uStart.shape), dtype=uStart.dtype)
-UFine_diff = np.empty((N + 1, len_rhs), dtype=uStart.dtype)
-UFine_alg = np.empty((N + 1, uStart.shape[0] - len_rhs), dtype=uStart.dtype)
 TFine = np.zeros(N + 1, dtype=uStart.dtype)
-
 UFine[0] = uStart
-UFine_diff[0] = uStart[:len_rhs, 0]
-UFine_alg[0] = uStart[len_rhs:, 0]
 
 for cycle in range(N):
     # fine propagator
-    tFine, solFine = fine_propagator.propagate(t=TFine[cycle], u=UFine[cycle], cycle=cycle)
-    TFine[cycle + 1] = tFine
-    UFine[cycle + 1] = solFine
-    UFine_diff[cycle + 1] = solFine[:len_rhs, 0]
-    UFine_alg[cycle + 1] = solFine[len_rhs:, 0]
+    TFine[cycle + 1], UFine[cycle + 1] = fine_propagator.propagate(t=TFine[cycle], u=UFine[cycle], cycle=cycle)
+UFine_diff = UFine[:, :len_rhs, 0]
+UFine_alg = UFine[:, len_rhs:, 0]
+
 # solve parareal
 parareal = PararealModified(fine=fine_propagator, coarse=coarse_propagator, coarse_s=coarse_propagator)
 try:
@@ -80,19 +74,13 @@ except Exception as e:
     print(f"Parareal execution failed: {e}")
 # %%
 # extract state
-UU = np.empty((K + 1, N + 1, state_size), dtype=uStart.dtype)
-Udiff = np.empty((K + 1, N + 1, len_rhs), dtype=uStart.dtype)
-Ualg = np.empty((K + 1, N + 1, state_size - len_rhs), dtype=uStart.dtype)
 # we don't analyze the derivatives of U: UP
 # because they are recomputed with every solver step
 # Tested when use same U but different UP, results are the same, so we can ignore UP
 # UPdiff = np.empty(U.shape, dtype=object)
-for k in range(K + 1):
-    for cycle in range(N + 1):
-        UU[k, cycle] = U[k, cycle, :, 0]
-        Udiff[k, cycle, :] = U[k, cycle, :len_rhs, 0]
-        Ualg[k, cycle, :] = U[k, cycle, len_rhs:, 0]
-
+UU = U[...,0]
+Udiff = U[:, :, :len_rhs, 0]
+Ualg = U[:, :, len_rhs:, 0]
 
 # error at the event points for the Parareal solver
 errTT = compute_parareal_errors(TT, TFine)
@@ -106,7 +94,6 @@ errU_diff_max = np.max(errU_diff, axis=1)  # error in event times for the Parare
 
 errU = compute_parareal_errors(UU, UFine[:, :, 0])
 errU_max = np.max(errU, axis=1)
-
 
 # plot error
 # plot error per iteration
