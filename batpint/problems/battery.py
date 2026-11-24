@@ -72,11 +72,11 @@ def batteryExperiment(nCycles=10, expType="GITT"):
         experiment = pybamm.Experiment(
             [
                 (
-                "Rest for 5 minutes",
-                "Discharge at 2C until 3.5 V",
-                "Rest for 5 minutes",
-                "Charge at 0.1C until 4.2 V",
-                #"Rest for 10 minutes"
+                    "Rest for 5 minutes",
+                    "Discharge at 2C until 3.5 V",
+                    "Rest for 5 minutes",
+                    "Charge at 0.1C until 4.2 V",
+                    # "Rest for 10 minutes"
                 )
             ]
             * nCycles

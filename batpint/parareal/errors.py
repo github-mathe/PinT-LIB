@@ -5,12 +5,12 @@ from typing import Any
 import numpy as np
 
 
-def _norm(value: Any, ord: int | float | None) -> float:
+def _norm(value: Any, ord: int | float | None):
     """Return a vector or scalar norm as a Python float."""
     array = np.asarray(value)
     if array.ndim == 0:
-        return float(np.abs(array))
-    return float(np.linalg.norm(array, ord=ord))
+        return np.abs(array)
+    return np.linalg.norm(array, ord=ord)
 
 
 def _error(
@@ -18,7 +18,7 @@ def _error(
     reference: Any,
     ord: int | float | None,
     relative: bool,
-) -> float:
+):
     absolute_error = _norm(np.asarray(computed) - np.asarray(reference), ord)
     if not relative:
         return absolute_error
@@ -61,14 +61,14 @@ def compute_parareal_errors(
         containing one error per component. For an array state, components are
         taken along its first axis.
     """
-    U = np.asarray(U, dtype=object)
-    u_exact = np.asarray(u_exact, dtype=object)
+    U = np.asarray(U, dtype=U.dtype)
+    u_exact = np.asarray(u_exact, dtype=u_exact.dtype)
 
-    if u_exact.shape != (U.shape[1],):
+    if u_exact.shape != (U.shape[1:]):
         raise ValueError("u_exact must have one entry per cycle.")
 
-    solution_errors = np.empty(U.shape, dtype=object)
-    for iteration, cycle in np.ndindex(U.shape):
+    solution_errors = np.empty(U.shape, dtype=np.float64)
+    for iteration, cycle in np.ndindex(U.shape[0:2]):
         solution_errors[iteration, cycle] = _error(U[iteration, cycle], u_exact[cycle], ord, relative)
 
     return solution_errors
