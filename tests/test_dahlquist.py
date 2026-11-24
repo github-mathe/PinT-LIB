@@ -138,7 +138,7 @@ def test_parareal_converges_on_dahlquist():
     )
 
     parareal = PararealModified(fine=pF, coarse=pG, coarse_s=pG)
-    TT, U = parareal.solve(t0=0, u0=1 + 0j, K=K, N=N)
+    TT, U = parareal.solve(t0=0, u0=1.0 + 0.0j, K=K, N=N)
 
     assert TT.shape == (K + 1, N + 1)
     assert U.shape == (K + 1, N + 1)
