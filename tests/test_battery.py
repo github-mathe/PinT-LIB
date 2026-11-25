@@ -9,8 +9,9 @@ from batpint.parameter.javid.common import BASE_PARAMS
 from batpint.problems.battery import (
     DEFAULT_VAR_PTS,
     batteryExperiment,
-    make_dfn_model,
+    make_battery_model,
     make_parameter_values,
+    make_propagator,
 )
 
 # --- Parameter structure ---
@@ -64,14 +65,19 @@ def test_battery_experiment_invalid_type():
 # --- Factory functions ---
 
 
-def test_make_dfn_model_half_cell():
-    model = make_dfn_model(half_cell=True)
+def test_make_battery_model_dfn_half_cell():
+    model = make_battery_model("DFN", half_cell=True)
     assert isinstance(model, pybamm.lithium_ion.DFN)
 
 
-def test_make_dfn_model_full_cell():
-    model = make_dfn_model(half_cell=False)
+def test_make_battery_model_dfn_full_cell():
+    model = make_battery_model("DFN", half_cell=False)
     assert isinstance(model, pybamm.lithium_ion.DFN)
+
+
+def test_make_battery_model_invalid_name():
+    with pytest.raises(ValueError, match="Choose 'DFN' or 'SPMe'"):
+        make_battery_model("SPM")
 
 
 def test_make_parameter_values():
@@ -85,15 +91,26 @@ def test_default_var_pts():
     assert "x_n" in DEFAULT_VAR_PTS
     assert "x_s" in DEFAULT_VAR_PTS
     assert "x_p" in DEFAULT_VAR_PTS
+    assert "r_n" in DEFAULT_VAR_PTS
     assert "r_p" in DEFAULT_VAR_PTS
     assert all(isinstance(v, int) and v > 0 for v in DEFAULT_VAR_PTS.values())
 
 
-def test_make_propagator_constructs():
+@pytest.mark.parametrize("half_cell", [True, False], ids=["half-cell", "full-cell"])
+@pytest.mark.parametrize(
+    ("model_options", "model_class"),
+    [
+        pytest.param({}, pybamm.lithium_ion.DFN, id="default-dfn"),
+        pytest.param({"model": "sPmE"}, pybamm.lithium_ion.SPMe, id="spme"),
+    ],
+)
+def test_make_propagator_constructs(half_cell, model_options, model_class):
     """make_propagator should return a PybammPropagator with valid initial state."""
-    from batpint.problems.battery import make_propagator
-
-    prop = make_propagator(half_cell=True, exp="CCCV", nCycles=1, rtol=1e-4)
+    atol = 1e-8
+    prop = make_propagator(half_cell=half_cell, exp="CCCV", nCycles=1, rtol=1e-4, atol=atol, **model_options)
+    assert prop.solver.atol == atol
+    assert isinstance(prop.sim.model, model_class)
+    assert prop.sim.model.options["working electrode"] == ("positive" if half_cell else "both")
     assert prop.t_start == 0.0
     assert prop.u_start.shape == prop.up_start.shape
     assert prop.u_full.shape == (prop.u_start.size, 2)
