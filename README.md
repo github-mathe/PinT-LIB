@@ -65,6 +65,18 @@ To install all dependencies at the same time (or check that they are installed),
 pip install -e .
 ```
 
+## Battery Models and Solver Tolerances
+
+Set `model_name` to `DFN` or `SPMe` in a battery script's parameters. Set `atol` to control the absolute tolerance shared by the solvers in that script. The default absolute tolerance is `1e-6`.
+
+In Python, select a model with `make_battery_model` or `make_propagator`. The propagator accepts `atol` as a keyword argument.
+
+```python
+from batpint.problems.battery import make_propagator
+
+propagator = make_propagator(model="SPMe", atol=1e-8)
+```
+
 ## Cell Parameters
 
 The cell parameters used in these test cases are based on the research published in:
