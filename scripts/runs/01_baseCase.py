@@ -5,13 +5,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pybamm
 
-import batpint.parameter.javid as bpar
 from batpint.plotting import configure_matplotlib
-from batpint.problems.battery import batteryExperiment
+from batpint.problems.battery import (
+    DEFAULT_ATOL,
+    batteryExperiment,
+    make_battery_model,
+    make_parameter_values,
+)
 
 configure_matplotlib()
 
 # Script parameters
+model_name = "DFN"  # DFN or SPMe
+atol = DEFAULT_ATOL
+
 half_cell = True
 exp = "CCCV"  # GITT or CCCV
 nCycles = 30
@@ -19,8 +26,7 @@ showTimeSteps = True
 sType = "IDAKLU"
 
 # Run script
-args = ({"working electrode": "positive"},) if half_cell else ()
-model = pybamm.lithium_ion.DFN(*args)
+model = make_battery_model(model_name, half_cell=half_cell)
 
 print("Model variables :")
 pprint(model.default_var_pts)
@@ -35,15 +41,15 @@ var_pts = {
 }
 
 # Setup experiment
-parameter_values = pybamm.ParameterValues(bpar.Li_half.PARAMS if half_cell else bpar.Li_full.PARAMS)
+parameter_values = make_parameter_values(half_cell)
 
 experiment = batteryExperiment(nCycles, expType=exp)
 
 # Setup solver
 if sType == "CASADI":
-    solver = pybamm.CasadiSolver(mode="safe")
+    solver = pybamm.CasadiSolver(mode="safe", atol=atol)
 elif sType == "IDAKLU":
-    solver = pybamm.IDAKLUSolver()
+    solver = pybamm.IDAKLUSolver(atol=atol)
 else:
     raise NotImplementedError(f"{sType=}")
 
@@ -65,7 +71,7 @@ capacity = sol["Discharge capacity [A.h]"].entries
 print(" -- done")
 
 # %% Plots
-label = f"{exp} ({'HC' if half_cell else 'FC'})"
+label = f"{model.name}, {exp} ({'HC' if half_cell else 'FC'})"
 
 plt.figure("voltage vs capacity")
 plt.plot(capacity, voltage, label=label)

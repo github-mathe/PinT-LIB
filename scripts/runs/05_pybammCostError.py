@@ -5,9 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from batpint.parareal.errors import compute_parareal_errors
-from batpint.problems.battery import make_propagator
+from batpint.problems.battery import DEFAULT_ATOL, make_propagator
 
 # Script parameters
+model_name = "DFN"  # DFN or SPMe
+atol = DEFAULT_ATOL
+
 half_cell = True
 exp = "CCCV"  # GITT or CCCV
 nCycles = 1
@@ -17,6 +20,7 @@ var_pts = {
     "x_n": 1,  # points in the negative electrode
     "x_s": 10,  # points in the separator
     "x_p": 10,  # points in the positive electrode
+    "r_n": 10,  # points in the radius of negative electrode
     "r_p": 10,  # points in the radius of positive electrode
 }
 
@@ -27,7 +31,9 @@ num_cycles = 4
 rtolCoarse = 1 / (10 ** np.arange(2, 7))
 rtolFine = 1e-6  # default
 
-fine_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolFine)
+fine_propagator = make_propagator(
+    half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolFine, atol=atol, model=model_name
+)
 uStart = copy.deepcopy(fine_propagator.u_full)
 solutionFine = np.empty((num_cycles + 1, *uStart.shape), dtype=uStart.dtype)
 solutionCoarse = np.empty((len(rtolCoarse), num_cycles + 1, *uStart.shape), dtype=uStart.dtype)
@@ -36,7 +42,9 @@ len_rhs = fine_propagator._last_step_model.len_rhs
 state_size = uStart.shape[0]
 
 coarse_propagators = [
-    make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtol_c)
+    make_propagator(
+        half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtol_c, atol=atol, model=model_name
+    )
     for rtol_c in rtolCoarse
 ]
 

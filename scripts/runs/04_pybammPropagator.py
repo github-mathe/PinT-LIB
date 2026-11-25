@@ -3,9 +3,18 @@
 import numpy as np
 import pybamm
 
-from batpint.problems.battery import batteryExperiment, make_dfn_model, make_parameter_values, make_propagator
+from batpint.problems.battery import (
+    DEFAULT_ATOL,
+    batteryExperiment,
+    make_battery_model,
+    make_parameter_values,
+    make_propagator,
+)
 
 # Script parameters
+model_name = "DFN"  # DFN or SPMe
+atol = DEFAULT_ATOL
+
 half_cell = True
 exp = "CCCV"  # GITT or CCCV
 nCycles = 1
@@ -17,19 +26,20 @@ var_pts = {
     "x_n": 1,  # points in the negative electrode
     "x_s": 10,  # points in the separator
     "x_p": 10,  # points in the positive electrode
+    "r_n": 10,  # points in the radius of negative electrode
     "r_p": 10,  # points in the radius of positive electrode
 }
 
 # %%
 # Run script
 def make_simulation():
-    """Create an independent DFN simulation."""
+    """Create an independent simulation with the selected model."""
     return pybamm.Simulation(
-        make_dfn_model(half_cell),
+        make_battery_model(model_name, half_cell=half_cell),
         experiment=batteryExperiment(nCycles, expType=exp),
         parameter_values=make_parameter_values(half_cell),
         var_pts=var_pts,
-        solver=pybamm.IDAKLUSolver(rtol=rtol),
+        solver=pybamm.IDAKLUSolver(rtol=rtol, atol=atol),
     )
 
 sim = make_simulation()
@@ -50,7 +60,9 @@ t_propagator = [0]
 t_delta = 0.0
 
 # %%
-pybamm_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtol)
+pybamm_propagator = make_propagator(
+    half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtol, atol=atol, model=model_name
+)
 uStart = pybamm_propagator.u_full
 solution_propagator.append(uStart)
 state_size = uStart.shape[0]

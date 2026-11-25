@@ -16,6 +16,7 @@ from batpint.parareal.plot import plot_error_per_cycle, plot_error_per_iteration
 from batpint.problems.battery import make_propagator
 
 # Script parameters
+model_name = "DFN"  # DFN or SPMe
 half_cell = True
 exp = "CCCV"  # GITT or CCCV
 nCycles = 1
@@ -25,24 +26,44 @@ var_pts = {
     "x_n": 1,  # points in the negative electrode
     "x_s": 10,  # points in the separator
     "x_p": 10,  # points in the positive electrode
+    #"r_n": 10,  # points in the radius of negative electrode
     "r_p": 10,  # points in the radius of positive electrode
 }
 
 # Parareal
-N = 5  # number of cycles
+N = 3  # number of cycles
 K = N  # number of iterations
 
+atol = 1e-6
 rtolCoarse = 1e-4
 rtolFine = 1e-5
 solver_options = {
-    "linear_solver":"SUNLinSol_Dense",
-    "jacobian":"dense",
-    "max_order_bdf": 1
+    #"linear_solver":"SUNLinSol_Dense",
+    #"jacobian":"dense",
+    "max_order_bdf": 5
     }
 
 # define the fine and coarse propagators
-fine_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolFine)
-coarse_propagator = make_propagator(half_cell=half_cell, exp=exp, nCycles=nCycles, var_pts=var_pts, rtol=rtolCoarse)
+fine_propagator = make_propagator(
+    half_cell=half_cell,
+    exp=exp,
+    nCycles=nCycles,
+    var_pts=var_pts,
+    rtol=rtolFine,
+    atol=atol,
+    solver_options=solver_options,
+    model=model_name,
+)
+coarse_propagator = make_propagator(
+    half_cell=half_cell,
+    exp=exp,
+    nCycles=nCycles,
+    var_pts=var_pts,
+    rtol=rtolCoarse,
+    atol=atol,
+    solver_options=solver_options,
+    model=model_name,
+)
 
 # initial conditions
 tStart = 0
@@ -86,9 +107,6 @@ Ualg = U[:, :, len_rhs:, 0]
 errTT = compute_parareal_errors(TT, TFine)
 errTT_max = np.max(errTT, axis=1)  # error in event times for the Parareal solver
 
-errU_alg = compute_parareal_errors(Ualg, UFine_alg)
-errU_alg_max = np.max(errU_alg, axis=1)
-
 errU_diff = compute_parareal_errors(Udiff, UFine_diff)
 errU_diff_max = np.max(errU_diff, axis=1)  # error in event times for the Parareal solver
 
@@ -100,7 +118,10 @@ errU_max = np.max(errU, axis=1)
 fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(12, 8), sharex=True)
 ax_left, ax_right = plot_error_per_iteration(ax_left, ax_right, errTT_max, errU_max, K, N)
 ax_right.plot(errU_diff_max, "--", color="blue", alpha=0.3)
-ax_right.plot(errU_alg_max, ":", color="blue", alpha=0.3)
+if len_rhs < state_size:
+    errU_alg = compute_parareal_errors(Ualg, UFine_alg)
+    errU_alg_max = np.max(errU_alg, axis=1)
+    ax_right.plot(errU_alg_max, ":", color="blue", alpha=0.3)
 ax_left.legend(labels=["time error"], loc="upper right")
 ax_right.legend(labels=["state error"], loc="upper right")
 

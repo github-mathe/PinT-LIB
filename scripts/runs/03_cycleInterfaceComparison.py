@@ -3,31 +3,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pybamm
 
-from batpint.problems.battery import batteryExperiment, make_dfn_model, make_parameter_values
+from batpint.problems.battery import (
+    DEFAULT_ATOL,
+    batteryExperiment,
+    make_battery_model,
+    make_parameter_values,
+)
 
 # Script parameters
+model_name = "DFN"  # DFN or SPMe
+atol = DEFAULT_ATOL
+
 half_cell = True
 exp = "CCCV"  # GITT or CCCV
 nCycles = 1
-num_cycles = 150
+num_cycles = 20
 
 # Space discretization
 var_pts = {
     "x_n": 1,  # points in the negative electrode
-    "x_s": 30,  # points in the separator
-    "x_p": 30,  # points in the positive electrode
-    "r_p": 30,  # points in the radius of positive electrode
+    "x_s": 10,  # points in the separator
+    "x_p": 10,  # points in the positive electrode
+    "r_n": 10,  # points in the radius of negative electrode
+    "r_p": 10,  # points in the radius of positive electrode
 }
 
 
 def make_simulation(nCycles):
-    """Create an independent DFN simulation."""
+    """Create an independent simulation with the selected model."""
     return pybamm.Simulation(
-        make_dfn_model(half_cell),
+        make_battery_model(model_name, half_cell=half_cell),
         experiment=batteryExperiment(nCycles, expType=exp),
         parameter_values=make_parameter_values(half_cell),
         var_pts=var_pts,
-        solver=pybamm.IDAKLUSolver(),
+        solver=pybamm.IDAKLUSolver(atol=atol),
     )
 
 
@@ -214,11 +223,12 @@ for i in range(num_cycles):
 
         err_ySwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position], ord=np.inf)
         err_yDiffSwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position][:len_rhs], ord=np.inf)
-        err_yAlgSwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position][len_rhs:], ord=np.inf)
 
         err_ypSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position], ord=np.inf)
         err_ypDiffSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position][:len_rhs], ord=np.inf)
-        err_ypAlgSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position][len_rhs:], ord=np.inf)
+        if len_alg:
+            err_yAlgSwitch[i, position] = np.linalg.norm(ySwitch_per_cycle[i, position][len_rhs:], ord=np.inf)
+            err_ypAlgSwitch[i, position] = np.linalg.norm(ypSwitch_per_cycle[i, position][len_rhs:], ord=np.inf)
 
 # %%
 # Interface differences at cycle interfaces.
@@ -226,7 +236,14 @@ colors = ["#D55E00", "#0072B2", "#009E73"]
 solver_labels = [f"Solver '{key}'" for key in results]
 
 fig1, ax = plt.subplots(figsize=(8, 4.5), layout="constrained")
-fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5), layout="constrained")
+state_plots = [(err_yDiffSwitch, r"$\|y_{+,d} - y_{-,d}\|_\infty$", "Differential-state")]
+if len_alg:
+    state_plots.append((err_yAlgSwitch, r"$\|y_{+,a} - y_{-,a}\|_\infty$", "Algebraic-state"))
+
+fig2, state_axes = plt.subplots(
+    1, len(state_plots), figsize=(6 * len(state_plots), 4.5), layout="constrained", squeeze=False
+)
+state_axes = state_axes[0]
 for position, label in enumerate(solver_labels):
     style = {
         "color": colors[position % len(colors)],
@@ -236,10 +253,10 @@ for position, label in enumerate(solver_labels):
         "label": label,
     }
     ax.plot(tSwitch_per_cycle[:, position], **style)
-    ax1.plot(err_yDiffSwitch[:, position], **style)
-    ax2.plot(err_yAlgSwitch[:, position], **style)
+    for state_ax, (errors, _, _) in zip(state_axes, state_plots):
+        state_ax.plot(errors[:, position], **style)
 
-for current_ax in (ax, ax1, ax2):
+for current_ax in (ax, *state_axes):
     current_ax.set_yscale("symlog", linthresh=1e-14)
     current_ax.set_xlabel("Cycles")
     current_ax.grid(True, which="both", linestyle=":", alpha=0.6)
@@ -252,11 +269,10 @@ for current_ax in (ax, ax1, ax2):
 
 ax.set_ylabel(r"$t_+ - t_-$")
 ax.set_title("Interface time difference")
-ax1.set_ylabel(r"$\|y_{+,d} - y_{-,d}\|_\infty$")
-ax1.set_title("Differential-state")
-ax2.set_ylabel(r"$\|y_{+,a} - y_{-,a}\|_\infty$")
-ax2.set_title("Algebraic-state")
-for current_ax in (ax, ax1, ax2):
+for state_ax, (_, ylabel, title) in zip(state_axes, state_plots):
+    state_ax.set_ylabel(ylabel)
+    state_ax.set_title(title)
+for current_ax in (ax, *state_axes):
     current_ax.title.set_fontsize(10)
 fig1.suptitle("Time mismatch at cycle interfaces")
 fig2.suptitle("State mismatch at cycle interfaces")
@@ -278,7 +294,7 @@ ax_new.set_title("From new")
 for current_ax in (ax_last, ax_new):
     current_ax.set_yscale("symlog", linthresh=1e-14)
     current_ax.set_xlabel(r"$t_{\Gamma}$")
-    current_ax.set_xticks(range(0, num_cycles, round(num_cycles / 5)))
+    current_ax.set_xticks(range(0, num_cycles, max(1, round(num_cycles / 5))))
     current_ax.legend()
 
 ax_last.set_ylabel(r"$\Delta t_{\Gamma}$")
@@ -303,19 +319,22 @@ diff_ypEnd_new_last = np.array(
 )
 # %%
 fig, ax = plt.subplots(2, 2, sharex="all")
-ax[0, 0].semilogy(diff_tStart_new_last, label=r"$\Delta t_{start}$", color="blue")
-ax[0, 0].semilogy(diff_tEnd_new_last, label=r"$\Delta t_{end}$", color="orange")
+for current_ax in ax.flat:
+    current_ax.set_yscale("symlog", linthresh=1e-14)
+
+ax[0, 0].plot(diff_tStart_new_last, label=r"$\Delta t_{start}$", color="blue")
+ax[0, 0].plot(diff_tEnd_new_last, label=r"$\Delta t_{end}$", color="orange")
 ax[0, 0].set_ylabel(r"$\Delta t$")
 
-ax[0, 1].semilogy(diff_yStart_new_last, label=r"$\Delta y_{start}$", color="blue")
-ax[0, 1].semilogy(diff_yEnd_new_last, label=r"$\Delta y_{end}$", color="orange")
+ax[0, 1].plot(diff_yStart_new_last, label=r"$\Delta y_{start}$", color="blue")
+ax[0, 1].plot(diff_yEnd_new_last, label=r"$\Delta y_{end}$", color="orange")
 ax[0, 1].set_ylabel(r"$\Delta y$")
 
-ax[1, 0].semilogy(diff_ypStart_new_last, label=r"$\Delta y'_{start}$", color="blue")
+ax[1, 0].plot(diff_ypStart_new_last, label=r"$\Delta y'_{start}$", color="blue")
 ax[1, 0].set_xlabel("cycles")
 ax[1, 0].set_ylabel(r"$\Delta y'$")
 
-ax[1, 1].semilogy(diff_ypEnd_new_last, label=r"$\Delta y'_{end}$", color="orange")
+ax[1, 1].plot(diff_ypEnd_new_last, label=r"$\Delta y'_{end}$", color="orange")
 ax[1, 1].set_xlabel("cycles")
 ax[1, 1].set_ylabel(r"$\Delta y'$")
 
