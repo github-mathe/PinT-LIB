@@ -103,11 +103,11 @@ class PybammPropagator(Propagator):
 
     def make_starting_solution(self, u):
         dummy_solution = pybamm.Solution(
-            all_ts=np.array([0.0]),
-            all_ys=np.array(u[:, 0].reshape(self._initial_solution.y.shape), copy=True),
-            all_models=self._last_step_model,
-            all_inputs=self.inputs,
-            all_yps=np.array(u[:, 1].reshape(self._initial_solution.yp.shape), copy=True),
+            all_ts=[np.array([0.0])],
+            all_ys=[np.array(u[:, 0].reshape(self._initial_solution.y.shape), copy=True)],
+            all_models=[self._last_step_model],
+            all_inputs=[self.inputs],
+            all_yps=[np.array(u[:, 1].reshape(self._initial_solution.yp.shape), copy=True)],
             t_event=None,
             y_event=None,
             options={"compile": False},

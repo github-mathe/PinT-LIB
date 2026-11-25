@@ -93,18 +93,18 @@ for cycle in range(num_cycles):
 # if not commented: we start from new solution constructed from the first_state
 # of the very first cycle computed before
 # %%
-start_sol = solution_from_last[0].first_state.copy()
-init_sol_new = pybamm.Solution(
-    all_ts=np.array([0.0]),
-    all_ys=np.array(start_sol.all_ys[-1], copy=True),
-    all_models=start_sol.all_models[-1],
-    all_inputs=start_sol.all_inputs[-1],
-    all_yps=np.array(start_sol.all_yps[-1], copy=True) if start_sol.all_yps is not None else None,
-    t_event=None,
-    y_event=None,
-    options=start_sol.user_options,
-    all_t_evals=None,
-)
+# start_sol = solution_from_last[0].first_state.copy()
+# init_sol_new = pybamm.Solution(
+#     all_ts=np.array([0.0]),
+#     all_ys=np.array(start_sol.all_ys[-1], copy=True),
+#     all_models=start_sol.all_models[-1],
+#     all_inputs=start_sol.all_inputs[-1],
+#     all_yps=np.array(start_sol.all_yps[-1], copy=True) if start_sol.all_yps is not None else None,
+#     t_event=None,
+#     y_event=None,
+#     options=start_sol.user_options,
+#     all_t_evals=None,
+# )
 
 # %%
 # compute again
@@ -123,11 +123,11 @@ for cycle in range(num_cycles):
     # create a solution object
     # with times 0 and states from the last state of the present solution cycle
     init_sol_new = pybamm.Solution(
-        all_ts=np.array([0.0]),
-        all_ys=np.array(sol_end.all_ys[-1], copy=True),
-        all_models=sol_end.all_models[-1],
-        all_inputs=sol_end.all_inputs[-1],
-        all_yps=np.array(sol_end.all_yps[-1], copy=True) if sol_end.all_yps is not None else None,
+        all_ts=[np.array([0.0])],
+        all_ys=[np.array(sol_end.all_ys[-1], copy=True)],
+        all_models=[sol_end.all_models[-1]],
+        all_inputs=[sol_end.all_inputs[-1]],
+        all_yps=[np.array(sol_end.all_yps[-1], copy=True)] if sol_end.all_yps is not None else None,
         t_event=None,
         y_event=None,
         options=sol_end.user_options,
